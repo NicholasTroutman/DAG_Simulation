@@ -9,3 +9,6 @@ venv
 
 # DS_Store
 .DS_Store
+
+# Huge files
+indirect_refs.csv
