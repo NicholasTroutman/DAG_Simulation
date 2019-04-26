@@ -55,7 +55,12 @@ python core.py
 
 In this file you can also change the configurations of the simulation.
 
-## Authors
+## Modified by
+
+* Sara Ghaemi
+* Caixiang Fan
+
+## Original Authors
 
 * Manuel Zander
 
