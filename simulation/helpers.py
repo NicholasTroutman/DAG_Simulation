@@ -154,18 +154,19 @@ def load_file(filename):
     return data
 
 
-def csv_export(self):
+def csv_export(self, file_name):
 
-    with open('data.csv', 'w', newline='') as file:
+    with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write genesis
-        writer.writerow([0,[]])
+        writer.writerow(['references', 'time'])
+        writer.writerow([0,[],0])
         for transaction in self.DG.nodes:
             #Write all other transaction
             if(transaction.arrival_time != 0):
                 line = []
                 line.append(transaction)
                 line.append(list(self.DG.successors(transaction)))
-                # line.append(transaction.arrival_time)
+                line.append(transaction.arrival_time)
                 # line.append(transaction.agent)
                 writer.writerow(line)

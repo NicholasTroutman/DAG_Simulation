@@ -33,14 +33,22 @@ from simulation.simulation_multi_agent import Multi_Agent_Simulation
 #Tip selection algorithms: Choose among "random", "weighted", "unweighted" as input
 
 start_time = timeit.default_timer()
-runs = 1
+# my_lambda = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+my_lambda = [1]
+# To make sure each running has 20 milestones issued so that enough confirmed txs can be obtained to cal mean()
+total_tx_nums = [x * 1200 for x in my_lambda]
+
+runs = len(my_lambda)
 
 for i in range(runs):
+    # file_name = 'lambda_{}_tansactions_{}.csv'.format(my_lambda[i], total_tx_nums[i])
+    file_name = 'lambda_{}_tansactions_{}_weighted_entry_point.csv'.format(my_lambda[i], 6000)
+    simu2 = Multi_Agent_Simulation(6000, my_lambda[i], 20, 0.001, 1, "weighted-entry-point", _printing=True)
+    # simu2 = Multi_Agent_Simulation(total_tx_nums[i], my_lambda[i], 20, 0.001, 1, "weighted", _printing=True)
 
-    simu2 = Multi_Agent_Simulation(800, 50, 2, 0.1, 1, "weighted", _printing=True)
     simu2.setup()
     simu2.run()
-    # csv_export(simu2)
+    csv_export(simu2, file_name)
 
 print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")
 
@@ -51,5 +59,6 @@ print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_ti
 # print_graph(simu2)
 # print_tips_over_time(simu2)
 # print_tips_over_time_multiple_agents(simu2, simu2.no_of_transactions)
-print_tips_over_time_multiple_agents_with_tangle(simu2, simu2.no_of_transactions)
+# print_tips_over_time_multiple_agents_with_tangle(simu2, simu2.no_of_transacti
+# ns)
 # print_attachment_probabilities_all_agents(simu2)

@@ -1,6 +1,7 @@
 import sys
 import timeit
 import random
+import time
 import math
 from collections import Counter
 import numpy as np
@@ -19,7 +20,7 @@ from simulation.transaction import Transaction
 class Multi_Agent_Simulation:
     def __init__(self, _no_of_transactions, _lambda, _no_of_agents, \
                  _alpha, _distance, _tip_selection_algo, _latency = 1, \
-                 _agent_choice=None, _printing=False):
+                 _agent_choice=None, _printing=False, _lambda_m=1/60):
 
         #Use configuration file when provided
         if(len(sys.argv) != 1):
@@ -37,6 +38,7 @@ class Multi_Agent_Simulation:
         else:
             self.no_of_transactions = _no_of_transactions
             self.lam = _lambda
+            self.lam_m = _lambda_m
             self.no_of_agents = _no_of_agents
             self.alpha = _alpha
             self.latency = _latency
@@ -101,6 +103,14 @@ class Multi_Agent_Simulation:
         #Create random arrival times
         inter_arrival_times = np.random.exponential(1 / self.lam, self.no_of_transactions)
         self.arrival_times = list(np.cumsum(inter_arrival_times))
+        # Calculate the number of milestones generated in the simulation time.
+        num_of_milestones = int((self.no_of_transactions / self.lam) * self.lam_m)
+
+        # num_of_milestones = 20
+        # Add the milestones to the transactions
+        for i in range(num_of_milestones):
+            self.arrival_times.append((1/self.lam_m)*(i+1))
+        self.arrival_times.sort()
 
         #Create genesis transaction object, store in list and add to graph object
         transaction_counter = 0
@@ -148,16 +158,20 @@ class Multi_Agent_Simulation:
             transaction.agent = np.random.choice(self.agents, p=self.agent_choice)
 
             #Add transaction to directed graph object (with random y coordinate for plotting the graph)
-            self.DG.add_node(transaction,pos=(transaction.arrival_time, \
+            self.DG.add_node(transaction, pos=(transaction.arrival_time, \
                 random.uniform(0, 1)-transaction.agent.id*1.3), \
                 node_color=self.agent_colors[transaction.agent.id])
 
+            start_selection = time.time()
             #Select tips
             self.tip_selection(transaction)
+            print('Tip selection took:', time.time() - start_selection)
 
+            start_update_weight = time.time()
             #Update weights (of transactions referenced by the current transaction)
-            if(self.tip_selection_algo == "weighted"):
+            if(self.tip_selection_algo == "weighted-genesis" or self.tip_selection_algo == "weighted-entry-point"):
                 self.update_weights_multiple_agents(transaction)
+            print('Weight updating took:', time.time() - start_update_weight)
 
             #Progress bar update
             if self.printing:
@@ -179,14 +193,20 @@ class Multi_Agent_Simulation:
 
     def tip_selection(self, transaction):
 
+        # Added a new type of tip selection algorithm called weighted entry point.
+        # In this new type, the tip selection does not go all the way back to genesis.
+
         if(self.tip_selection_algo == "random"):
             self.random_selection(transaction)
         elif (self.tip_selection_algo == "unweighted"):
             self.unweighted_MCMC(transaction)
-        elif(self.tip_selection_algo == "weighted"):
-            self.weighted_MCMC(transaction)
+        elif (self.tip_selection_algo == "weighted-genesis"):
+            self.weighted_genesis_MCMC(transaction)
+        elif (self.tip_selection_algo == "weighted-entry-point"):
+            self.weighted_entry_point_MCMC(transaction)
         else:
-            print("ERROR:  Valid tip selection algorithms are 'random', 'weighted', 'unweighted'")
+            print("ERROR:  Valid tip selection algorithms are 'random', 'weighted-genesis', 'weighted-entry-point', "
+                  "'unweighted'")
             sys.exit()
 
 
@@ -315,9 +335,21 @@ class Multi_Agent_Simulation:
 
 
     #############################################################################
-    # TIP-SELECTION: UNWEIGHTED
+    # Find an Entry_Point based on the selected depth.
     #############################################################################
 
+    def find_entry_point(self, transaction, depth=1):
+        milestone_arrival_times = [(1/self.lam_m)*i for i in range(int(transaction.arrival_time * self.lam_m) + 1)]
+        if len(milestone_arrival_times) > depth:
+            for i in self.transactions:
+                if i.arrival_time == milestone_arrival_times[-1*depth]:
+                    return i
+        else:
+            return self.transactions[0]
+
+    #############################################################################
+    # TIP-SELECTION: UNWEIGHTED
+    #############################################################################
 
     def unweighted_MCMC(self, transaction):
 
@@ -346,7 +378,7 @@ class Multi_Agent_Simulation:
 
     def unweighted_random_walk(self, transaction, valid_tips):
 
-        #Start walk at genesis
+        # Start walk at genesis
         walker_on = self.transactions[0]
 
         #If only genesis a valid tip, approve genesis
@@ -368,7 +400,7 @@ class Multi_Agent_Simulation:
     #############################################################################
 
 
-    def weighted_MCMC(self, transaction):
+    def weighted_genesis_MCMC(self, transaction):
 
         #Needed for plotting number of tips over time for ALL agents
         for agent in self.agents:
@@ -384,8 +416,8 @@ class Multi_Agent_Simulation:
         self.record_tips.append(valid_tips)
 
         #Walk to two tips
-        tip1 = self.weighted_random_walk(transaction, valid_tips)
-        tip2 = self.weighted_random_walk(transaction, valid_tips)
+        tip1 = self.weighted_random_walk(transaction, valid_tips, self.transactions[0])
+        tip2 = self.weighted_random_walk(transaction, valid_tips, self.transactions[0])
 
         #Add tips to graph (only once)
         self.DG.add_edge(transaction, tip1)
@@ -393,10 +425,33 @@ class Multi_Agent_Simulation:
             self.DG.add_edge(transaction, tip2)
 
 
-    def weighted_random_walk(self, transaction, valid_tips):
+    def weighted_entry_point_MCMC(self, transaction):
+        # Needed for plotting number of tips over time for ALL agents
+        for agent in self.agents:
+            if (agent != transaction.agent):
+                self.get_visible_transactions(transaction.arrival_time, agent)
+                valid_tips = self.get_valid_tips_multiple_agents(agent)
+                agent.record_tips.append(valid_tips)
+
+        # Get visible transactions and valid tips (and record these)
+        self.get_visible_transactions(transaction.arrival_time, transaction.agent)
+        valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
+        transaction.agent.record_tips.append(valid_tips)
+        self.record_tips.append(valid_tips)
+
+        # Walk to two tips
+        start = time.time()
+        tip1 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction, depth=3))
+        tip2 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction, depth=3))
+        print('Weighted random walk took :', time.time() - start)
+
+    def weighted_random_walk(self, transaction, valid_tips, initial_walker_on):
 
         #Start walk at genesis
-        walker_on = self.transactions[0]
+        walker_on = initial_walker_on
+
+        # #Start walk at genesis
+        # walker_on = self.transactions[0]
 
         #If only genesis a valid tip, approve genesis
         if (valid_tips == [walker_on]):
@@ -421,13 +476,16 @@ class Multi_Agent_Simulation:
 
     def update_weights_multiple_agents(self, incoming_transaction):
 
-        #Update all descendants of incoming_transaction only (cum_weight += 1)
+        entrypoint = self.find_entry_point(incoming_transaction, 3)
+
+        # Update all descendants of incoming_transaction only (cum_weight += 1)
         for transaction in nx.descendants(self.DG, incoming_transaction):
 
-            #Update for each agent separately
-            for agent in self.agents:
-                if(transaction in agent.visible_transactions):
-                    transaction.cum_weight_multiple_agents[agent] += 1
+            if transaction.arrival_time >= entrypoint.arrival_time:
+                # Update for each agent separately
+                for agent in self.agents:
+                    if transaction in agent.visible_transactions:
+                        transaction.cum_weight_multiple_agents[agent] += 1
 
 
     def calc_exit_probabilities_multiple_agents(self, incoming_transaction):
@@ -520,24 +578,24 @@ class Multi_Agent_Simulation:
         return attachment_probabilities_all
 
     #Performs 100 random walks per agent to caluclate attachment probabilities
-    def attachment_probabilities_2(self, incoming_transaction):
-
-        self.calc_exit_probabilities_multiple_agents(incoming_transaction)
-
-        all_tips = []
-
-        for agent in self.agents:
-
-            #Get visible transactions and valid tips (and record these)
-            self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
-            valid_tips = self.get_valid_tips_multiple_agents(agent)
-
-            for i in range(100):
-                tip = self.weighted_random_walk(incoming_transaction, valid_tips)
-                all_tips.append(tip.agent)
-
-        print(all_tips)
-        c = Counter(all_tips)
-        perc = [(i, c[i] / len(all_tips) * 100.0) for i in c]
-
-        return perc
+    # def attachment_probabilities_2(self, incoming_transaction):
+    #
+    #     self.calc_exit_probabilities_multiple_agents(incoming_transaction)
+    #
+    #     all_tips = []
+    #
+    #     for agent in self.agents:
+    #
+    #         #Get visible transactions and valid tips (and record these)
+    #         self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
+    #         valid_tips = self.get_valid_tips_multiple_agents(agent)
+    #
+    #         for i in range(100):
+    #             tip = self.weighted_random_walk(incoming_transaction, valid_tips)
+    #             all_tips.append(tip.agent)
+    #
+    #     print(all_tips)
+    #     c = Counter(all_tips)
+    #     perc = [(i, c[i] / len(all_tips) * 100.0) for i in c]
+    #
+    #     return perc

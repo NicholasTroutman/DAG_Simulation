@@ -12,10 +12,10 @@ def print_info(self):
     text = "\nParameters:  Transactions = " + str(self.no_of_transactions) + \
             ",  Tip-Selection = " + str(self.tip_selection_algo).upper() + \
             ",  Lambda = " + str(self.lam)
+    if(self.tip_selection_algo == "weighted-genesis" or "weighted-entry-point"):
+        text += ",  Alpha = " + str(self.alpha)
     if(self.no_of_agents != 1):
         text += ",  Distances = " + str(self.distances)
-    if(self.tip_selection_algo == "weighted"):
-        text += ",  Alpha = " + str(self.alpha)
     text += " | Simulation started...\n"
     print(text)
 
@@ -46,7 +46,13 @@ def print_graph(self):
     # col = list(nx.get_node_attributes(self.DG, 'node_color').values()) #Didn't work on Linux
     col = []
     for transaction in self.DG:
-        col.append(self.DG.node[transaction]["node_color"])
+        if transaction.arrival_time > 0 and transaction.arrival_time % (1/self.lam_m) == 0:
+
+            print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.arrival_time)
+            col.append('maroon')
+        else:
+            col.append(self.DG.node[transaction]["node_color"])
+
 
     #Creating figure
     plt.figure(figsize=(14, 7))
@@ -57,7 +63,7 @@ def print_graph(self):
     title = "Transactions = " + str(self.no_of_transactions) +\
             ",  " + r'$\lambda$' + " = " + str(self.lam) +\
             ",  " + r'$d$' + " = " + str(self.distances[1][0])
-    if(self.tip_selection_algo == "weighted"):
+    if(self.tip_selection_algo == "weighted-genesis" or "weighted-entry-point"):
         title += ",  " + r'$\alpha$' + " = " + str(self.alpha)
     plt.xlabel("Time (s)")
     plt.yticks([])
