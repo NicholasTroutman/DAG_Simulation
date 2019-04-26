@@ -1,6 +1,6 @@
 # IOTA TANGLE SIMULATION
 
-This is a single- and multi-agent simulation of the IOTA Tangle, as described in the white-paper.
+This is originally a single- and multi-agent simulation of the IOTA Tangle, as described in the white-paper, which is extended to support Coodinator and transaction confirmation simulations. This extended simulator is used to build a hybrid model in this M.Sc thesis project.
 
 ## Getting Started
 
@@ -55,7 +55,12 @@ python core.py
 
 In this file you can also change the configurations of the simulation.
 
-## Authors
+## Modified by
+
+* Sara Ghaemi
+* Caixiang Fan
+
+## Original Authors
 
 * Manuel Zander
 
