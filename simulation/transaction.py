@@ -14,8 +14,18 @@ class Transaction:
         self.confirmation_confidence = 0
         self.confirmation_confidence_multiple_agents = defaultdict(lambda: 0)
 
+        #For performance statistics
+        self.weight_update_time = 0
+        self.tip_selection_time = 0
+
     def __str__(self):
         return str(self.id)
 
     def __repr__(self):
         return str(self.id)
+    
+    def set_weight_update_time(self, weight_update_time):
+        self.weight_update_time = weight_update_time
+
+    def set_tip_selection_time(self, tip_selection_time):
+        self.tip_selection_time = tip_selection_time

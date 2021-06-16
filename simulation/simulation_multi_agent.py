@@ -7,6 +7,7 @@ from collections import Counter
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from numpy.random import rand
 
 from simulation.helpers import update_progress, create_distance_matrix, \
 common_elements, clamp, load_file
@@ -34,6 +35,7 @@ class Multi_Agent_Simulation:
             self.tip_selection_algo = self.config[0][6]
             self.agent_choice = self.config[0][7]
             self.printing = self.config[0][8]
+            self.total_num_tx = self.config[0][0]
         #Otherwise use the provided parameters
         else:
             self.no_of_transactions = _no_of_transactions
@@ -42,6 +44,7 @@ class Multi_Agent_Simulation:
             self.no_of_agents = _no_of_agents
             self.alpha = _alpha
             self.latency = _latency
+            self.total_num_tx = _no_of_transactions
             if (type(_distance) is float or type(_distance) is int):
                 self.distances = create_distance_matrix(self.no_of_agents, _distance)
             else:
@@ -103,13 +106,14 @@ class Multi_Agent_Simulation:
         #Create random arrival times
         inter_arrival_times = np.random.exponential(1 / self.lam, self.no_of_transactions)
         self.arrival_times = list(np.cumsum(inter_arrival_times))
-        # Calculate the number of milestones generated in the simulation time.
-        num_of_milestones = int((self.no_of_transactions / self.lam) * self.lam_m)
-
-        # num_of_milestones = 20
-        # Add the milestones to the transactions
-        for i in range(num_of_milestones):
-            self.arrival_times.append((1/self.lam_m)*(i+1))
+        
+        #if milestone issue rate is not zero, calculate number of milestones
+        if self.lam_m != 0:
+            num_of_milestones = int((self.no_of_transactions / self.lam) * self.lam_m)
+            self.total_num_tx += num_of_milestones
+            for i in range(num_of_milestones):
+                self.arrival_times.append((1/self.lam_m)*(i+1))
+        
         self.arrival_times.sort()
 
         #Create genesis transaction object, store in list and add to graph object
@@ -165,17 +169,20 @@ class Multi_Agent_Simulation:
             start_selection = time.time()
             #Select tips
             self.tip_selection(transaction)
-            print('Tip selection took:', time.time() - start_selection)
+
+            ts_time = np.round(time.time() - start_selection, 5)
+            transaction.set_tip_selection_time(ts_time)
 
             start_update_weight = time.time()
             #Update weights (of transactions referenced by the current transaction)
-            if(self.tip_selection_algo == "weighted-genesis" or self.tip_selection_algo == "weighted-entry-point"):
+            if("weighted-" in self.tip_selection_algo):
                 self.update_weights_multiple_agents(transaction)
-            print('Weight updating took:', time.time() - start_update_weight)
+            weight_update_time = np.round(time.time() - start_update_weight, 5)
+            transaction.set_weight_update_time(weight_update_time)
 
             #Progress bar update
             if self.printing:
-                update_progress(transaction.id/self.no_of_transactions, transaction)
+                update_progress(transaction.id/self.total_num_tx, transaction)
 
         if self.printing:
             print("Simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")
@@ -192,9 +199,6 @@ class Multi_Agent_Simulation:
 
 
     def tip_selection(self, transaction):
-
-        # Added a new type of tip selection algorithm called weighted entry point.
-        # In this new type, the tip selection does not go all the way back to genesis.
 
         if(self.tip_selection_algo == "random"):
             self.random_selection(transaction)
@@ -335,17 +339,17 @@ class Multi_Agent_Simulation:
 
 
     #############################################################################
-    # Find an Entry_Point based on the selected depth.
+    # Find an Entry_Point randomly from 100lambda~200lambda txs ago for TIP-SELECTION walk
     #############################################################################
 
-    def find_entry_point(self, transaction, depth=1):
-        milestone_arrival_times = [(1/self.lam_m)*i for i in range(int(transaction.arrival_time * self.lam_m) + 1)]
-        if len(milestone_arrival_times) > depth:
-            for i in self.transactions:
-                if i.arrival_time == milestone_arrival_times[-1*depth]:
-                    return i
-        else:
-            return self.transactions[0]
+    def find_entry_point(self, transaction):
+        tx_idx = 0
+        if transaction.id > 100 * self.lam:
+            low = max(0, transaction.id- 200*self.lam)
+            high = transaction.id - 100*self.lam
+            tx_idx = np.random.randint(low=low, high=high)
+        return self.transactions[tx_idx]
+            
 
     #############################################################################
     # TIP-SELECTION: UNWEIGHTED
@@ -440,10 +444,13 @@ class Multi_Agent_Simulation:
         self.record_tips.append(valid_tips)
 
         # Walk to two tips
-        start = time.time()
-        tip1 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction, depth=3))
-        tip2 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction, depth=3))
-        print('Weighted random walk took :', time.time() - start)
+        tip1 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction))
+        tip2 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction))
+
+        self.DG.add_edge(transaction, tip1)
+        if (tip1 != tip2):
+            self.DG.add_edge(transaction, tip2)
+
 
     def weighted_random_walk(self, transaction, valid_tips, initial_walker_on):
 
@@ -476,7 +483,7 @@ class Multi_Agent_Simulation:
 
     def update_weights_multiple_agents(self, incoming_transaction):
 
-        entrypoint = self.find_entry_point(incoming_transaction, 3)
+        entrypoint = self.find_entry_point(incoming_transaction)
 
         # Update all descendants of incoming_transaction only (cum_weight += 1)
         for transaction in nx.descendants(self.DG, incoming_transaction):

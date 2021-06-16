@@ -1,14 +1,19 @@
 # python cache
 *.pyc
-
+*.csv
 # virtual env
 venv
 
 # pycharm
 .idea/
 
+# vscode
+.vscode/
+
+# simulation data
+SimuData/
+
 # DS_Store
 .DS_Store
-
-# Huge files
+indirect_refs.csv
 indirect_refs.csv

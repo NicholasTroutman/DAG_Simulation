@@ -1,5 +1,4 @@
-import timeit
-import pickle
+import timeit, time, os
 import numpy as np
 import scipy.stats as st
 import networkx as nx
@@ -36,18 +35,27 @@ start_time = timeit.default_timer()
 # my_lambda = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 my_lambda = [1]
 # To make sure each running has 20 milestones issued so that enough confirmed txs can be obtained to cal mean()
-total_tx_nums = [x * 1200 for x in my_lambda]
+# total_tx_nums = [x * 1200 for x in my_lambda]
+tsa = "weighted-entry-point" # weighted-entry-point, weighted-genesis, unweighted, random
+netsize = 20
+lam_m = 0
+alpha = 0.001
+txs = 1200
 
-runs = len(my_lambda)
-
-for i in range(runs):
-    # file_name = 'lambda_{}_tansactions_{}.csv'.format(my_lambda[i], total_tx_nums[i])
-    file_name = 'lambda_{}_tansactions_{}_weighted_entry_point.csv'.format(my_lambda[i], 6000)
-    simu2 = Multi_Agent_Simulation(6000, my_lambda[i], 20, 0.001, 1, "weighted-entry-point", _printing=True)
-    # simu2 = Multi_Agent_Simulation(total_tx_nums[i], my_lambda[i], 20, 0.001, 1, "weighted", _printing=True)
-
+dir_name = './SimuData/2021-06'
+suffix = '.csv'
+for lam in my_lambda:
+    timestr = time.strftime("%Y%m%d-%H%M")
+    base_name = '{}lam_{}_txs_{}_tsa_{}_size_{}' \
+                .format(timestr, lam, txs, tsa, netsize)
+    simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
+                                _no_of_agents = netsize,_alpha = alpha,
+                                _distance = 1, _tip_selection_algo = tsa,
+                                _latency=1, _agent_choice=None, 
+                                _printing=True, _lambda_m=lam_m)
     simu2.setup()
     simu2.run()
+    file_name = os.path.join(dir_name, base_name + suffix)
     csv_export(simu2, file_name)
 
 print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")
@@ -59,6 +67,5 @@ print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_ti
 # print_graph(simu2)
 # print_tips_over_time(simu2)
 # print_tips_over_time_multiple_agents(simu2, simu2.no_of_transactions)
-# print_tips_over_time_multiple_agents_with_tangle(simu2, simu2.no_of_transacti
-# ns)
+# print_tips_over_time_multiple_agents_with_tangle(simu2, simu2.no_of_transactions)
 # print_attachment_probabilities_all_agents(simu2)
