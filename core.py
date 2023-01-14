@@ -37,12 +37,12 @@ my_lambda = [1]
 # To make sure each running has 20 milestones issued so that enough confirmed txs can be obtained to cal mean()
 # total_tx_nums = [x * 1200 for x in my_lambda]
 tsa = "weighted-entry-point" # weighted-entry-point, weighted-genesis, unweighted, random
-netsize = 20
+netsize = 50
 lam_m = 0
 alpha = 0.001
-txs = 1200
+txs = 100
 
-dir_name = './SimuData/2021-06'
+dir_name = './SimuData/'
 suffix = '.csv'
 for lam in my_lambda:
     timestr = time.strftime("%Y%m%d-%H%M")
