@@ -140,7 +140,7 @@ class Multi_Agent_Simulation:
 
         if self.printing:
             print_info(self)
-
+    
         #Create dictionary with simulation parameter changes when provided
         if(len(sys.argv) != 1):
             dic = {x[0]: x[1:] for x in self.config[1:]}
@@ -163,7 +163,7 @@ class Multi_Agent_Simulation:
 
             #Add transaction to directed graph object (with random y coordinate for plotting the graph)
             self.DG.add_node(transaction, pos=(transaction.arrival_time, \
-                random.uniform(0, 1)-transaction.agent.id*1.3), \
+                random.uniform(0, 1)-transaction.agent.id*2), \
                 node_color=self.agent_colors[transaction.agent.id])
 
             start_selection = time.time()
@@ -195,8 +195,8 @@ class Multi_Agent_Simulation:
 
         if self.printing:
             print("Calculation time further measures: " + str(np.round(timeit.default_timer() - start_time2, 3)) + " seconds\n")
-            # print("\nGraph information:\n" + nx.info(self.DG))
-
+            #print("\nGraph information:\n" + nx.info(self.DG))
+            print_graph(self)
 
     def tip_selection(self, transaction):
 
@@ -262,7 +262,7 @@ class Multi_Agent_Simulation:
                 else:
                     #Get distance from agent to agent of transaction from distance matrix
                     distance = self.distances[agent.id][transaction.agent.id]
-
+                    
                     #Determine if the transaction is visible (incoming_transaction.arrival_time determines current time)
                     if (transaction.arrival_time + self.latency + distance <= incoming_transaction_time):
 
