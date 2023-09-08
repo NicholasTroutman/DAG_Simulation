@@ -1,9 +1,11 @@
 import pickle
 import numpy as np
-import networkx as nx
+import networkx as nx #dag graphs
 import matplotlib.pyplot as plt
-
-
+import imageio #gif making
+import matplotlib.cm as cm #coloring
+import sys
+import math
 #############################################################################
 # PRINTING AND PLOTTING
 #############################################################################
@@ -19,7 +21,7 @@ def print_info(self):
     text += " | Simulation started...\n"
     print(text)
 
-def print_graph(self):
+def print_graph_temp(self):
 
     #Positioning and text of labels
     pos = nx.get_node_attributes(self.DG, 'pos')
@@ -47,15 +49,16 @@ def print_graph(self):
     col = []
     for transaction in self.DG:
         if transaction.arrival_time > 0 and transaction.arrival_time % (1/self.lam_m) == 0:
-
-            print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.arrival_time)
+            
+            linked=list(nx.descendants(self.DG, transaction))
+            print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.arrival_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
             col.append('maroon')
         else:
             col.append(self.DG.nodes[transaction]["node_color"])
 
 
     #Creating figure
-    plt.figure(figsize=(14, 7))
+    plt.figure(1,figsize=(14, 7))
     nx.draw_networkx(self.DG, pos, with_labels=True, node_size = 100, font_size=5.5, node_color = col)
     # nx.draw_networkx_labels(self.DG, lower_pos, labels=labels, font_size=6)
 
@@ -68,9 +71,237 @@ def print_graph(self):
     plt.xlabel("Time (s)")
     plt.yticks([])
     plt.title(title)
-    plt.show()
     #Save the graph
-    plt.savefig('graph.png')
+    plt.savefig('graphTemp.png')
+    #plt.show() ##Hangs here??
+
+
+def print_graph(self):
+
+    #Positioning and text of labels
+    pos = nx.get_node_attributes(self.DG, 'pos')
+    lower_pos = {key: (x, y - 0.07) for key, (x, y) in pos.items()} #For label offset (0.1)
+
+    #Create labels with the confirmation confidence of every transaction (of the issueing agent)
+    #labels = {
+        # transaction: str(str(np.round(transaction.exit_probability_multiple_agents[transaction.agent], 2)) + "  " +
+        #                  str(np.round(transaction.confirmation_confidence_multiple_agents[transaction.agent], 2)))
+    #    transaction : str(np.round(transaction.exit_probability_multiple_agents[transaction.agent],2))
+    #    for transaction in self.DG.nodes if transaction.creators != None ##for transaction in self.DG.nodes if transaction.agent != None
+    #}
+    #For genesis take agent 0 as default (always same value)
+    #labels[self.transactions[0]] = str(np.round(self.transactions[0].exit_probability_multiple_agents[self.agents[0]],2))
+
+    #col = [['r','b'][int(np.round(transaction.confirmation_confidence,1))] for transaction in self.DG.nodes()] #Color change for 100% confidence
+
+    #Coloring of nodes
+    tips = self.get_tips()
+    for tip in tips:
+        # self.DG.node[tip]["node_color"] = '#ffdbb8'
+        self.DG.nodes[tip]["node_color"] = self.agent_tip_colors[int(str(tip.creators[0]))]
+
+    
+
+    # col = list(nx.get_node_attributes(self.DG, 'node_color').values()) #Didn't work on Linux
+    col = []
+    for transaction in self.DG:
+        if transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
+            linked=list(nx.descendants(self.DG, transaction))
+            
+            print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
+            col.append('maroon')
+        else:
+            col.append(self.DG.nodes[transaction]["node_color"])
+
+
+    #Creating figure
+    plt.figure(1,figsize=(14, 7))
+    nx.draw_networkx(self.DG, pos, with_labels=True, node_size = 100, font_size=5.5, node_color = col)
+    # nx.draw_networkx_labels(self.DG, lower_pos, labels=labels, font_size=6)
+
+    #Print title
+    title = "Transactions = " + str(self.no_of_transactions) +\
+            ",  " + r'$\lambda$' + " = " + str(self.lam) +\
+            ",  " + r'$d$' + " = " + str(self.distances[1][0])
+    if(self.tip_selection_algo == "weighted-genesis" or "weighted-entry-point"):
+        title += ",  " + r'$\alpha$' + " = " + str(self.alpha)
+    plt.xlabel("Time (s)")
+    plt.yticks([])
+    plt.title(title)
+    #Save the graph
+    plt.savefig(f'./img/graph.png')
+    plt.show()
+
+
+##NT: print_position of agents
+def print_coordinates(self, agents, time):
+
+    colors = cm.rainbow(np.linspace(0, 1, len(agents)))
+
+    ##NT: get agents coordinates into posx and posy
+    posx=[]
+    posy=[]
+    
+    #Creating figure
+    plt.figure(2,figsize=(14, 7))
+    plt.cla()
+    ax = plt.gca()
+    
+    for index, agent in enumerate(agents):
+        linex=[]
+        liney=[]
+       
+        posx.append(agent.coordinates[0])
+        posy.append(agent.coordinates[1])
+        
+        
+        #print(index,": curr Pos: ",str(agent.coordinates))
+        #get linegraph
+        for coordinates in agent.past_coordinates:
+            linex.append(coordinates[0])
+            liney.append(coordinates[1])
+            
+            #print(coordinates)
+        
+        plt.plot(linex,liney,color=colors[index]) #past positions
+        
+        #plot radius
+        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),10, color='black', fill=False)
+        ax.add_artist(circle)
+        
+        if time>0:
+            curX = [linex[-1],agent.coordinates[0]]
+            curY = [liney[-1],agent.coordinates[1]]
+            plt.plot(curX, curY, color=colors[index]) #current pos
+        
+        
+    ##Get agent labels:
+    labels=[]
+    for i in range(0,len(agents)):
+        labels.append("Agent "+str(i+1))
+                
+    #create scatterplot
+    plt.scatter(posx,posy,color=colors) #original
+    ##reverse yx for image matching
+    #plt.scatter(posy,posx,color=colors)
+    #Print title
+    title = "Transactions = " + str(self.no_of_transactions) + ", Time: " + str(time)
+    plt.xlabel("X axis Coordinates")
+    plt.ylabel("Y axis Coordinates")
+    plt.title(title)
+    
+    for i, label in enumerate(labels):
+        plt.annotate(label,[posx[i],posy[i]])
+    plt.xlim(0,100)
+    plt.ylim(0,100)
+    #Save the graph
+    plt.savefig(f'./img/CG_{time}.png')
+    #plt.close()
+    #plt.show() 
+    
+    
+    
+##NT: print_position of agents overtop backgroundimg
+
+##NT: print_position of agents
+def print_coordinates_img(self, agents, time, backgroundImg):
+
+    colors = cm.rainbow(np.linspace(0, 1, len(agents)))
+
+    ##NT: get agents coordinates into posx and posy
+    posx=[]
+    posy=[]
+    
+    #Creating figure
+    plt.figure(2,figsize=(14, 7))
+    plt.cla()
+    ax = plt.gca()
+    plt.imshow(backgroundImg)
+    
+    for index, agent in enumerate(agents):
+        linex=[]
+        liney=[]
+       
+        posx.append(agent.coordinates[0])
+        posy.append(agent.coordinates[1])
+        
+        #print(index,": curr Pos: ",str(agent.coordinates))
+        #get linegraph
+        for coordinates in agent.past_coordinates:
+            linex.append(coordinates[0])
+            liney.append(coordinates[1])
+            #print(coordinates)
+        
+        plt.plot(linex,liney,color=colors[index]) #past positions
+        
+        #plot radius
+        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),60, color='black', fill=False)
+        ax.add_artist(circle)
+        
+        if time>0:
+            curX = [linex[-1],agent.coordinates[0]]
+            curY = [liney[-1],agent.coordinates[1]]
+            plt.plot(curX, curY, color=colors[index]) #current pos
+        
+        
+    ##Get agent labels:
+    labels=[]
+    for i in range(0,len(agents)):
+        labels.append("Agent "+str(i+1))
+                
+                
+    #create scatterplot
+    #for i in range(0,len(agents)): #check
+    #    print("Agent:  ",i," ",agents[i].coordinates[0],", ",agents[i].coordinates[1])
+    #    print(posx[i],", ",posy[i])
+    
+        
+    plt.scatter(posx,posy,color=colors, s=250)
+    #Print title
+    title = "Transactions = " + str(self.no_of_transactions) + ", Time: " + str(time)
+    plt.xlabel("X axis Coordinates")
+    plt.ylabel("Y axis Coordinates")
+    plt.title(title)
+    
+    for i, label in enumerate(labels):
+        plt.annotate(label,[posx[i],posy[i]])
+    #plt.xlim(0,backgroundImg.shape[1])
+    #plt.ylim(0,backgroundImg.shape[0])
+    #Save the graph
+    plt.savefig(f'./img/CG_{time}.png')
+    #plt.close()
+    #plt.show() 
+    
+    ##end program
+    #sys.exit()
+    
+
+def print_gif(self, transactions):
+
+    time=[]
+    frames=[]
+   # #get all tx.arrival_times
+    #for tx in transactions:
+     #   time.append(tx.arrival_time)
+      ##Load Times
+    endTime = math.ceil(self.transactions[-1].arrival_time)
+    for i in range(1,endTime):
+        time.append(i)
+    #load all frames
+    image=[]
+    
+    for t in time:
+        image = imageio.imread(f'./img/CG_{t}.png')
+        frames.append(image)
+        
+    #for i in range(0,5):
+    #    frames.append(image)
+        
+    #create gif
+    #imageio.mimsave('./CG_gif.gif',  frames,  fps = 5)  #fps is no longer supported, use duration 
+    imageio.mimsave('./CG_gif.gif',  frames, duration=2)  
+
+
 
 def print_tips_over_time(self):
 

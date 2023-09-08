@@ -6,7 +6,30 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-def update_progress(progress, transaction):
+
+#create agent 
+
+#NT: Create random coordinates for each agent
+def create_coordinates(agents, maxDistance,):
+    for agent in agents:
+        agent.coordinates=np.random.uniform(0,maxDistance,2).tolist()
+
+#create random coordinates in [x,y] shape, of trafficImage
+def create_coordinates_nodes(agents, graph, tsp):
+    for agent in agents:
+        begin, dest=np.random.choice(graph.nodes, size=2, replace=False)
+        #print(agent,": ",origin)
+        agent.coordinates = graph.nodes[begin]['pos']
+        agent.prev_dest = begin
+        agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set 
+        
+        streetSlope=[ graph.nodes[agent.destination[0]]['pos'][0]- graph.nodes[begin]['pos'][0],  graph.nodes[agent.destination[0]]['pos'][1] - graph.nodes[begin]['pos'][1]  ]   
+        
+        agent.vector=streetSlope/np.linalg.norm(streetSlope)
+        #print(agent.vector)
+
+
+def update_progress(progress, time):
 
     bar_length = 50
     status = ""
@@ -21,7 +44,7 @@ def update_progress(progress, transaction):
         status = "| Simulation completed...\r\n"
     block = int(round(bar_length*progress))
     text = "\rPercent:  [{0}] {1}% | Number:  {2} {3}".\
-        format( "#"*block + "-"*(bar_length-block), np.round((progress*100),1), transaction, status)
+        format( "#"*block + "-"*(bar_length-block), np.round((progress*100),1), time, status)
     sys.stdout.write(text)
     sys.stdout.flush()
 
@@ -159,17 +182,34 @@ def csv_export(self, file_name):
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
-        writer.writerow(['txID', 'tips', 'arrival_time', 'agent', 'tsa_time', 'weight_update_time'])
+        
+        header=['txID', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+        for transaction in self.DG.nodes:
+            #print("seenList: ",transaction.seen)
+            for agentId, agentSeen in enumerate(transaction.seen):
+                header.append(str("agent_"+str(agentId+1)))
+            break
+        print(header)
+        writer.writerow(header) #add confirmation time + 
         #Write genesis
-        writer.writerow([0,[],0, '', 0, 0])
+        #writer.writerow([0,[],0, '', 0, 0])
         for transaction in self.DG.nodes:
             #Write all other transactions
-            if(transaction.arrival_time != 0):
+            if(transaction.creation_time != 0):
                 line = []
-                line.append(transaction)
-                line.append(list(self.DG.successors(transaction)))
-                line.append(transaction.arrival_time)
-                line.append(transaction.agent)
-                line.append(transaction.tip_selection_time)
-                line.append(transaction.weight_update_time)
+                line.append(transaction.id) #txid
+                line.append(list(self.DG.successors(transaction))) #tips
+                line.append(transaction.creation_time) #arrival_time
+                line.append(transaction.creators) ##int(transaction.creators[0].id)+1) #agent
+                
+                
+                #line.append(0) ##line.append(transaction.tip_selection_time
+                #line.append(0) ## line.append(transaction.weight_update_time)
+                line.append(len(list(nx.descendants(self.DG, transaction)))/(transaction.id+0.001)) #adoption_rate
+                line.append(transaction.blockTransactions)
+                for agentSeen in transaction.seen:
+                    line.append(agentSeen)
                 writer.writerow(line)
+
