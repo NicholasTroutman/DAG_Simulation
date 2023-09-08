@@ -12,20 +12,21 @@ from operator import add
 
 from simulation.helpers import update_progress, create_distance_matrix, \
 common_elements, clamp, load_file, create_coordinates, create_coordinates_nodes
-from simulation.mapMaker import Distance, DistanceToVector, FindCenter, FindEdges, IdentfiyBlueEdgeIntersection,  LoadImageIntoGraph, isBetween
-from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents
+from simulation.mapMaker import Distance, DistanceToVector,  FindEdges, IdentfiyBlueEdgeIntersection,  LoadImageIntoGraph, isBetween
+from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents, print_coordinates_img_including_baseStations
 from simulation.agent import Agent
 from simulation.transaction import Transaction
-from simulation.block import block
+from simulation.block import Block, BaseStationBlock
 
+from simulation.baseStation import BaseStation
 
 class Multi_Agent_Simulation:
     def __init__(self, _no_of_transactions, _lambda, _no_of_agents, \
                  _alpha, _distance, _tip_selection_algo, _latency = 1, \
-                 _agent_choice=None, _printing=False, _lambda_m=1/60, _seed=10):
+                 _agent_choice=None, _printing=False, _lambda_m=1/60, _seed=10, _map="DCRedBlue.png"):
 
         #Use configuration file when provided
-        if(len(sys.argv) == -1): #nick changed to make obsolete
+        if(len(sys.argv) == -1): #nick changed to make obsolete config File
             self.config = load_file(sys.argv[1])
             self.no_of_transactions = self.config[0][0]
             self.lam = self.config[0][1]
@@ -56,6 +57,7 @@ class Multi_Agent_Simulation:
                 _agent_choice = list(np.ones(self.no_of_agents)/self.no_of_agents)
             self.agent_choice = _agent_choice
             self.printing = _printing
+            self.map = _map
 
         #Basic parameter checks
         if (round(sum(self.agent_choice), 3) != 1.0):
@@ -72,6 +74,8 @@ class Multi_Agent_Simulation:
         self.agents = []
         self.arrival_times = []
         self.not_visible_transactions = []
+
+        self.baseStations= [] #stationary base Stations
         
         ##block variables
         self.blocks=[]
@@ -110,7 +114,7 @@ class Multi_Agent_Simulation:
 
         #Create directed graph object
         self.DG = nx.DiGraph()
-        self.traffic, self.backgroundImg= LoadImageIntoGraph('DCredblue.png') #hardcoded image, graph and image saved
+        self.traffic, self.backgroundImg= LoadImageIntoGraph(self.map) #hardcoded image, graph and image saved
         
         print("Traffic: ",self.backgroundImg.shape)
         
@@ -170,28 +174,44 @@ class Multi_Agent_Simulation:
                 
                     agent.vector=streetSlope/np.linalg.norm(streetSlope)
     
-        
+        ##create BaseStations
+        for i in range(0,2): #hardcodes for coordinate position=node[id]
+            
+            coordinates=self.traffic.nodes[i]['pos']#get permenant coordinates for static baseStation
+            #print(i)
+            #print(coordinates)
+            self.baseStations.append(BaseStation(i,coordinates)) #BaseStation(id,permenantPosition)
+
+
 
 
         #Move all agents
     def moveAgents(self, arrival_time, prevTime):
         for agent in self.agents:
+           #print("Moving Agent:\t",agent)
             agent.past_coordinates.append(agent.coordinates)
+            #print("\t",agent.past_coordinates)
             ##old system random walk
             #agent.coordinates=agent.coordinates + np.random.normal(0,6,2)*(transaction.arrival_time-prevTime)
             
             #new system directed TSP
             #Speed/second
             speed = agent.speed
+            #print("\tSpeed: ",speed)
             scalar=(arrival_time-prevTime)*speed
+            #print("\tScalar: ",scalar)
             vector = [v*scalar for v in agent.vector]
-            newCoord = list( map(add, agent.coordinates, vector) )
+            #print("\tVector: ",vector)
+            newCoord = list( map(add, agent.coordinates, vector))
+            #print("\tNewCoord: ",newCoord)
            
             
             
             if (isBetween(newCoord, self.traffic.nodes[agent.destination[0]]['pos'], agent.coordinates)==False): #epsilon=0.5, if true, then not between
+                #print("\tNot at intersection yet")
                 agent.coordinates=newCoord
             else: #overshot, new coordinates are agent.destination[0]
+                #print("\tOvershot")
                 agent.coordinates=self.traffic.nodes[agent.destination[0]]['pos'] #new coordinates are center of intersection
                 agent.prev_dest=agent.destination[0] #arrived at destination
                 if len(agent.destination)>1: #more places to go
@@ -215,9 +235,12 @@ class Multi_Agent_Simulation:
                     
             
             #If coordinates are outside boundaries [0,backgroundImg.shape[0]] bounce them back in, 101-->99, -1-->1. bounce around boundary, not pacman
-            if agent.coordinates[0]>self.backgroundImg.shape[0] or agent.coordinates[0]<0:
+
+            if agent.coordinates[0]>self.backgroundImg.shape[1] or agent.coordinates[0]<0:
+                print("\tAgent coordinates: ",agent.coordinates[0],"  - ",self.backgroundImg.shape[0])
+                print("ERROR:\tPACMAN BOUNCE?!")
                 agent.coordinates[0]=-1*agent.coordinates[0]%self.backgroundImg.shape[0] #100 MAGIC NUMBER
-            if agent.coordinates[1]>self.backgroundImg.shape[1] or agent.coordinates[1]<0:
+            if agent.coordinates[1]>self.backgroundImg.shape[0] or agent.coordinates[1]<0:
                                 agent.coordinates[1]=-1*agent.coordinates[1]%self.backgroundImg.shape[1] #MAGIC NUMBER
            
 
@@ -269,8 +292,9 @@ class Multi_Agent_Simulation:
         
         
         ##save coordinates in figure
-        print_coordinates_img(self,self.agents,0, self.backgroundImg)
-        
+        #print_coordinates_img(self,self.agents,0, self.backgroundImg)
+        print_coordinates_img_including_baseStations(self,self.agents, self.baseStations, 0 , self.backgroundImg)
+            
         
         #append genesis transaction block to users
         #for agent in self.agents:
@@ -312,7 +336,7 @@ class Multi_Agent_Simulation:
                 self.cleanOldTxsAndBlocks(transaction) ##Do something every 400 to clean visible_transactions
 
             ##exchange transactions           
-            self.transfer_txs_and_blocks(self.agents,  transaction.arrival_time)
+            self.transfer_txs_and_blocks(self.agents,  i) #time is i instead of arrival_time
             
 
 
@@ -321,7 +345,7 @@ class Multi_Agent_Simulation:
                 #np.random.uniform(0, 1)+transaction.agent.id*2), \
                 #node_color=self.agent_colors[transaction.agent.id])
 
-            start_selection = time.time() #timing for analysis
+            #start_selection = time.time() #timing for analysis
            
            #Select tips
             #self.tip_selection(transaction)
@@ -356,8 +380,8 @@ class Multi_Agent_Simulation:
 
             ##save coordinates in frame for gif making later
             if self.printing:
-                print_coordinates_img(self,self.agents, i , self.backgroundImg)
-            
+                #print_coordinates_img(self,self.agents, i , self.backgroundImg)
+                print_coordinates_img_including_baseStations(self,self.agents, self.baseStations, i , self.backgroundImg)
             ##print temporary graph of the system before it is done
            # if (transaction.id==30):
            #     print_graph_temp(self) #temp graph
@@ -368,7 +392,7 @@ class Multi_Agent_Simulation:
             print("TX_ID: ",transaction.id)
 
         #For measuring partitioning
-        start_time2 = timeit.default_timer()
+        #start_time2 = timeit.default_timer()
         # self.calc_exit_probabilities_multiple_agents(transaction)
         # self.calc_attachment_probabilities(transaction)
         # self.calc_confirmation_confidence_multiple_agents(transaction)
@@ -377,7 +401,7 @@ class Multi_Agent_Simulation:
         print("Show DAG")
         print_graph(self)
         if self.printing:
-            print("Calculation time further measures: " + str(np.round(timeit.default_timer() - start_time2, 3)) + " seconds\n")
+            #print("Calculation time further measures: " + str(np.round(timeit.default_timer() - start_time2, 3)) + " seconds\n")
             #print("\nGraph information:\n" + nx.info(self.DG))
             
                 
@@ -388,20 +412,6 @@ class Multi_Agent_Simulation:
             print("DONE PRINTING")
             #print_coordinates(self,self.agents)
 
-    def tip_selection(self, transaction):
-
-        if(self.tip_selection_algo == "random"):
-            self.random_selection(transaction)
-        elif (self.tip_selection_algo == "unweighted"):
-            self.unweighted_MCMC(transaction)
-        elif (self.tip_selection_algo == "weighted-genesis"):
-            self.weighted_genesis_MCMC(transaction)
-        elif (self.tip_selection_algo == "weighted-entry-point"):
-            self.weighted_entry_point_MCMC(transaction)
-        else:
-            print("ERROR:  Valid tip selection algorithms are 'random', 'weighted-genesis', 'weighted-entry-point', "
-                  "'unweighted'")
-            sys.exit()
 
 
     def check_parameters_changes(self, transaction, parameters):
@@ -431,6 +441,7 @@ class Multi_Agent_Simulation:
         return tips
 
 
+    ##IS THIS BEING USED? Seems redundant with node.get_visible_transactions and trade
     def get_visible_transactions(self, incoming_transaction_time, incoming_transaction_agent):
 
         #Initialize empty lists (for each transaction these are populated again)
@@ -470,46 +481,6 @@ class Multi_Agent_Simulation:
                         self.not_visible_transactions.append(transaction)
 
 
- ##Create block between N agents within close proximity
-    def create_block_nearby(self, agents, time): #radius=distance for tx transfer,
-        print("\nCREATING BLOCK\n")
-        
-        
-        print("Agents: ",agents)
-        ##get all txs
-        txs=[]
-        for agent in agents:
-            print("AGENT TXS: ",agent.get_visible_transactions())
-            txs = list(set(txs) | set(agent.get_visible_transactions())) ##combine all freeTxs
-        
-        print("TX Unions: ",txs)
-        if txs==[]:
-            print("No Txs for block")
-            return
-        
-        ##get links
-        visBlocks=[]
-        for agent in agents:
-            visBlocks = list(set(visBlocks) | set(agent.get_visible_blocks()))
-
-        print("Block #: ", len(self.blocks))
-        print("NumBlocks #: ",self.DG.number_of_nodes())
-        newBlock = block(txs, agents, time, len(self.blocks), self.no_of_agents)
-        self.blocks.append(newBlock)
-        for agent in agents:
-            agent.usedTxs=txs
-            agent.freeTxs=[]
-        
-        self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
-                np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
-                node_color=self.agent_colors[newBlock.creators[0].id])
-        
-        
-        #choose tsa
-        self.tip_selection(newBlock)
-        for agent in agents:
-            agent.add_visible_blocks([newBlock], time)
-            
             
             
             
@@ -517,7 +488,7 @@ class Multi_Agent_Simulation:
             
      
     ##TODO: transfer transactions and blocks within radius
-    def transfer_txs_and_blocks(self,agents, time): #radius=distance for tx transfer,
+    def transfer_txs_and_blocks(self, agents, time): #radius=distance for tx transfer,
     #def transfer_transactions(self,agents, time): #radius=distance for tx transfer,
         radius=agents[0].radius #save radius in agent variables
         #if agents within radius, transfer txs
@@ -556,391 +527,76 @@ class Multi_Agent_Simulation:
                             agents[index].add_visible_transactions(iVisibleTxs, time)
                             agents[i].add_visible_transactions(indexVisibleTxs, time)
                             
+
             ##localBlock necessity
-            if neighborsCount > 2: #2
-                self.create_block_nearby(neighbors,  time)
+            #if neighborsCount > 2: #2
+               # self.create_block_nearby(neighbors,  time)
 
 
+##TODO: transfer transactions and blocks within radius
+    def transfer_txs_and_blocks_including_baseStations(self, agents, time): #radius=distance for tx transfer,
+    #def transfer_transactions(self,agents, time): #radius=distance for tx transfer,
+        radius=agents[0].radius #save radius in agent variables
+        #if agents within radius, transfer txs
+        numAgents=len(agents)-1
+        neighbors=[]
+        #loop through all agents and append txs
+        for index, agent in enumerate(agents):
+
+            if (index!=numAgents): #end condition
+                neighbors=[agents[index]]
+                neighborsCount=0 #number of neighbors, if meets threshold, then create block
+
+                for i in range(index,len(agents)): #check distance between all agents
+
+                    if (i != index):
+                        distance=math.hypot(agents[index].coordinates[0] - agents[i].coordinates[0], agents[index].coordinates[1] - agents[i].coordinates[1])
+
+                        if distance<radius:  #neighbors
+                            neighborsCount += 1
+                            neighbors.append(agents[i])
+                        
+                            ##trade blocks
+                            agents[index].add_visible_blocks(agents[i].get_visible_blocks(), time)
+                            agents[i].add_visible_blocks(agents[index].get_visible_blocks(), time)
+                            
+                            ##trade txs
+
+                            #confirmed_txs
+                            agent[index].add_confirmed_transactions(agents[i]._confirmed_transactions, time)
+                            agent[i].add_confirmed_transactions(agents[index]._confirmed_transactions, time)
+
+                            #visible_txs
+                            agents[index].add_visible_transactions(agents[i].get_visible_transactions(), time)
+                            agents[i].add_visible_transactions(agents[index].get_visible_transactions(), time)
+
+                            
+                            
+            ##localBlock necessity
+            #if neighborsCount > 2: #2
+               # self.create_block_nearby(neighbors,  time)
+
+       #base station transfer transactions
+        for index, agent in enumerate(agents):
+            for bs in baseStations:
+                distance=math.hypot(agent.coordinates[0] - bs.coordinates[0], agent.coordinates[1] - bs.coordinates[1])
+                if bs.radius < radius: #neigbors
+                    ##Trade Txs
+                    #trade txs to baseStation
+                    bs.add_confirmed_transactions(agent._confirmed_transactions, time)
+                    bs.add_visible_transactions(agent._visible_transactions, time) 
+                    #trade txs to agents
+                    agent.add_confirmed_transactions(bs._confirmed_transactions, time)
+                    agent.add_visible_transactions(bs._visible_transactions, time)
+
+                    ##Trade Blocks
+                    #trade blocks to baseStations
+                    bs.add_confirmed_blocks(agent._confirmed_blocks, time)
+                    bs.add_visible_blocks(agent._visible_blocks, time) 
+                    #trade blocks to agents
+                    agent.add_confirmed_blocks(bs._confirmed_blocks, time)
+                    agent.add_visible_blocks(bs._visible_blocks, time)
       
 
                 
-                
-    #returns valid tips for a given agent
-    def get_valid_tips_multiple_agents(self, agent):
 
-        valid_tips = []
-        print("ALL txs: ",agent.get_visible_blocks())
-        #print("class: ",agent.get_visible_transactions()[0].__class__)
-        if len(agent.get_visible_blocks())>0  :
-            for b in agent.get_visible_blocks():
-
-                #NDT DEBUG
-                #print("TX CHECKED: ",transaction.id)
-                #print("Seen: ", agent.get_visible_transactions())
-                #print(list(self.DG.predecessors(transaction)))
-                #print("block: ",transaction)
-                #Add to valid tips if transaction has no approvers at all
-                #print(len(list(self.DG.predecessors(transaction))))
-                if(len(list(self.DG.predecessors(b))) == 0):
-                    valid_tips.append(b) 
-
-                #Add to valid tips if all approvers not visible yet
-                #elif(self.all_approvers_not_visible(transaction)):
-
-                 #   valid_tips.append(transaction)
-
-                #add to valid tips if no approvers are visible yet
-                elif(len(set(list(self.DG.predecessors(b))).intersection(set(agent.get_visible_blocks()))) == 0): #if no predecssors of tx are in visible transaction
-                    #print("\n\n!!!!!!! HASN'T SEEN NEW LINK YET !!!!\n\n")
-                    valid_tips.append(b)
-            
-        return valid_tips
-
-
-    def all_approvers_not_visible(self, transaction):
-        return set(list(self.DG.predecessors(transaction))).issubset(set(self.not_visible_transactions))
-
-
-    def calc_transition_probabilities_multiple_agents(self, approvers, agent):
-
-        weights = [approver.cum_weight_multiple_agents[agent] for approver in approvers]
-        normalized_weights = [weight - max(weights) for weight in weights]
-
-        denominator_transition_probabilities = sum([math.exp(self.alpha * weight) \
-        for weight in normalized_weights])
-
-        return [math.exp(self.alpha * (approver.cum_weight_multiple_agents[agent] \
-                - max(weights))) / denominator_transition_probabilities \
-                for approver in approvers]
-
-
-    #############################################################################
-    # TIP-SELECTION: RANDOM
-    #############################################################################
-
-
-    def random_selection(self, block):
-
-        #Needed for plotting number of tips over time for ALL agents
-        #for agent in self.agents:
-        #    if(agent != transaction.agent):
-        #        self.get_visible_transactions(transaction.arrival_time, agent)
-        #        valid_tips = self.get_valid_tips_multiple_agents(agent)
-        #        agent.record_tips.append(valid_tips)
-
-        #Get visible transactions and valid tips (and record these)
-        #self.get_visible_transactions(transaction.arrival_time, transaction.agent)
-        valid_tips = self.get_valid_tips_multiple_agents(block.creators[0])
-        block.creators[0].record_tips.append(valid_tips)
-        self.record_tips.append(valid_tips)
-        
-        
-        ##error check print all transactions
-        #print("\nAvailable Txs")
-        #for tx in transaction.agent.visible_transactions:
-        #    print(tx) #seen node_color
-        #    print(list(self.DG.predecessors(tx)))
-        #    print(len(list(self.DG.predecessors(tx))))
-
-        #Reference 2-8 random tips
-        valid_tips2 = valid_tips.copy() #create copy to edit
-        print("Valid Tips: ",valid_tips2)
-        for count, tip in enumerate(valid_tips):
-            if count>7: #no more than 8 tips 
-                break
-            tempTip = np.random.choice(valid_tips2) #get randomTip
-            self.DG.add_edge(block, tempTip) #add tip
-            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
-            block.blockLinks.append(tempTip)
-
-    #############################################################################
-    # Find an Entry_Point randomly from 100lambda~200lambda txs ago for TIP-SELECTION walk
-    #############################################################################
-
-    def find_entry_point(self, transaction):
-        tx_idx = 0
-        if transaction.id > 100 * self.lam:
-            low = max(0, transaction.id- 200*self.lam)
-            high = transaction.id - 100*self.lam
-            tx_idx = np.random.randint(low=low, high=high)
-        return self.transactions[tx_idx]
-            
-
-    #############################################################################
-    # TIP-SELECTION: UNWEIGHTED
-    #############################################################################
-
-    def unweighted_MCMC(self, transaction):
-
-        #Needed for plotting number of tips over time for ALL agents
-        #for agent in self.agents:
-        #    if(agent != transaction.agent):
-        #        self.get_visible_transactions(transaction.arrival_time, agent)
-        #        valid_tips = self.get_valid_tips_multiple_agents(agent)
-        #        agent.record_tips.append(valid_tips)
-        
-        valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
-        transaction.agent.record_tips.append(valid_tips)
-        self.record_tips.append(valid_tips)
-
-        #Get visible transactions and valid tips (and record these)
-        #self.get_visible_transactions(transaction.arrival_time, transaction.agent)
-        #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
-        transaction.agent.record_tips.append(valid_tips)
-        self.record_tips.append(valid_tips)
-        
-        
-        valid_tips2=valid_tips.copy() #create copy to edit
-        
-        for count, tip in enumerate(valid_tips):
-            if count>7: #no more than 8 tips 
-                break
-            #tempTip = np.random.choice(valid_tips2) #get randomTip
-            tempTip = self.unweighted_random_walk(transaction, valid_tips2)
-            self.DG.add_edge(transaction, tempTip) #add tip
-            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
-            
-            
-        #Walk to two tips
-        #tip1 = self.unweighted_random_walk(transaction, valid_tips)
-        #tip2 = self.unweighted_random_walk(transaction, valid_tips)
-
-        #Add tips to graph (only once)
-        #self.DG.add_edge(transaction,tip1)
-        #if(tip1 != tip2):
-        #    self.DG.add_edge(transaction,tip2)
-
-
-    def unweighted_random_walk(self, transaction, valid_tips):
-        print("Start Unweighted Random Walk")
-        # Start walk at genesis
-        walker_on = self.transactions[0]
-
-        #If only genesis a valid tip, approve genesis
-        if (valid_tips == [walker_on]):
-            return walker_on
-
-        while (walker_on not in valid_tips):
-
-            approvers = list(self.DG.predecessors(walker_on))
-            print("Approvers: ", list(self.DG.predecessors(walker_on)))
-            visible_approvers = common_elements(approvers, transaction.agent.get_visible_transactions())
-            print("Visible_approvers: ", visible_approvers)
-            walker_on = np.random.choice(visible_approvers)
-
-        return walker_on
-
-
-    #############################################################################
-    # TIP-SELECTION: WEIGHTED
-    #############################################################################
-
-
-    def weighted_genesis_MCMC(self, transaction):
-
-        ##Needed for plotting number of tips over time for ALL agents
-        #for agent in self.agents:
-        #    if(agent != transaction.agent):
-        #        self.get_visible_transactions(transaction.arrival_time, agent)
-        #        valid_tips = self.get_valid_tips_multiple_agents(agent)
-        #        agent.record_tips.append(valid_tips)
-
-        ##Get visible transactions and valid tips (and record these)
-        #self.get_visible_transactions(transaction.arrival_time, transaction.agent)
-        #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
-        #transaction.agent.record_tips.append(valid_tips)
-        #self.record_tips.append(valid_tips)
-        
-        
-        #Collect valid tips and record them
-        valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
-        transaction.agent.record_tips.append(valid_tips)
-        self.record_tips.append(valid_tips)
-
-        #Walk to two tips
-        tip1 = self.weighted_random_walk(transaction, valid_tips, self.transactions[0])
-        tip2 = self.weighted_random_walk(transaction, valid_tips, self.transactions[0])
-
-        #Add tips to graph (only once)
-        self.DG.add_edge(transaction, tip1)
-        if (tip1 != tip2):
-            self.DG.add_edge(transaction, tip2)
-
-
-    def weighted_entry_point_MCMC(self, transaction):
-        ## Needed for plotting number of tips over time for ALL agents
-        #for agent in self.agents:
-        #    if (agent != transaction.agent):
-        #        self.get_visible_transactions(transaction.arrival_time, agent)
-        #        valid_tips = self.get_valid_tips_multiple_agents(agent)
-        #        agent.record_tips.append(valid_tips)
-
-        ## Get visible transactions and valid tips (and record these)
-        #self.get_visible_transactions(transaction.arrival_time, transaction.agent)
-        #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
-        transaction.agent.record_tips.append(valid_tips)
-        self.record_tips.append(valid_tips)
-
-        # Walk to two tips
-        tip1 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction))
-        tip2 = self.weighted_random_walk(transaction, valid_tips, self.find_entry_point(transaction))
-
-        self.DG.add_edge(transaction, tip1)
-        if (tip1 != tip2):
-            self.DG.add_edge(transaction, tip2)
-
-
-    def weighted_random_walk(self, transaction, valid_tips, initial_walker_on):
-
-        #Start walk at genesis
-        walker_on = initial_walker_on
-
-        # #Start walk at genesis
-        # walker_on = self.transactions[0]
-
-        #If only genesis a valid tip, approve genesis
-        if (valid_tips == [walker_on]):
-            return walker_on
-
-        while (walker_on not in valid_tips):
-
-            approvers = list(self.DG.predecessors(walker_on))
-            visible_approvers = common_elements(approvers, transaction.agent.visible_transactions)
-            transition_probabilities = self.calc_transition_probabilities_multiple_agents(visible_approvers, transaction.agent)
-
-            #Choose with transition probabilities
-            walker_on = np.random.choice(visible_approvers, p=transition_probabilities)
-
-        return walker_on
-
-
-    #############################################################################
-    # CONFIRMATION CONFIDENCE: MULTI AGENT
-    #############################################################################
-
-
-    def update_weights_multiple_agents(self, incoming_transaction):
-
-        entrypoint = self.find_entry_point(incoming_transaction)
-
-        # Update all descendants of incoming_transaction only (cum_weight += 1)
-        for transaction in nx.descendants(self.DG, incoming_transaction):
-
-            if transaction.arrival_time >= entrypoint.arrival_time:
-                # Update for each agent separately
-                for agent in self.agents:
-                    if transaction in agent.visible_transactions:
-                        transaction.cum_weight_multiple_agents[agent] += 1
-
-
-    def calc_exit_probabilities_multiple_agents(self, incoming_transaction):
-
-        for agent in self.agents:
-
-            #Reset exit probability of all transactions to 0%, just needed when run multiple times throughout simulation
-            for transaction in self.DG.nodes:
-                transaction.exit_probability_multiple_agents[agent] = 0
-
-            #Set genesis to 100%
-            self.transactions[0].exit_probability_multiple_agents[agent] = 1
-
-            #Determine visible transaction for t + 1, so that all transactions (h = 1) are included
-            #self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
-
-        #Start at genesis, tips in the end
-        sorted = list(reversed(list(nx.topological_sort(self.DG))))
-
-        #Calculate exit probabilities
-        for transaction in sorted:
-
-            for agent in self.agents:
-
-                if (transaction in agent.visible_transactions):
-
-                    #Get visible direct approvers and transition probabilities to walk to them
-                    approvers = list(self.DG.predecessors(transaction))
-                    visible_approvers = common_elements(approvers, agent.visible_transactions)
-                    transition_probabilities = self.calc_transition_probabilities_multiple_agents(visible_approvers, agent)
-
-                    #For every visible direct approver update the exit probability by adding the exit probability
-                    #of the current transaction times the transition probabilitiy of walking to the approver
-                    for (approver, transition_probability) in zip(visible_approvers, transition_probabilities):
-                        approver.exit_probability_multiple_agents[agent] += (
-                                    transaction.exit_probability_multiple_agents[agent] * transition_probability)
-
-
-    def calc_confirmation_confidence_multiple_agents(self, incoming_transaction):
-
-        #Loop over agents and get visible transactions and valid tips
-        for agent in self.agents:
-            #self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
-            agent.tips = self.get_valid_tips_multiple_agents(agent)
-
-            #Loop over visible transactions
-            for transaction in agent.visible_transactions:
-                #Reset confirmation confidence to 0%, just needed when function called multiple times during simulation
-                # transaction.confirmation_confidence_multiple_agents[agent] = 0
-
-                #Loop over valid tips
-                for tip in agent.tips:
-
-                    if(nx.has_path(self.DG,tip,transaction) and tip != transaction):
-
-                        transaction.confirmation_confidence_multiple_agents[agent] += tip.exit_probability_multiple_agents[agent]
-
-                    #Tips have 0 confirmation confidence by default
-                    tip.confirmation_confidence_multiple_agents[agent] = 0
-
-
-    #Uses exit probabilities to caluclate attachment probabilities
-    def calc_attachment_probabilities(self, incoming_transaction):
-
-        attachment_probabilities_without_main = []
-        attachment_probabilities_all = []
-
-        self.calc_exit_probabilities_multiple_agents(incoming_transaction)
-
-        for agent in self.agents:
-            #self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
-            agent.tips = self.get_valid_tips_multiple_agents(agent)
-
-        for agent in self.agents:
-
-            sum_ = 0
-            sum_ = sum(tip.exit_probability_multiple_agents[agent] for tip in agent.tips if tip.agent == agent)
-
-            for other_agent in self.agents:
-                if(other_agent != agent):
-                    sum_ += sum(tip.exit_probability_multiple_agents[other_agent] for tip in other_agent.tips if tip.agent == agent)
-
-            attachment_probabilities_all.append(sum_/self.no_of_agents)
-
-            if(agent != self.agents[0]):
-                attachment_probabilities_without_main.append(sum_/self.no_of_agents)
-
-        # print(attachment_probabilities_without_main)
-        # print(attachment_probabilities_all)
-        return attachment_probabilities_all
-
-    #Performs 100 random walks per agent to caluclate attachment probabilities
-    # def attachment_probabilities_2(self, incoming_transaction):
-    #
-    #     self.calc_exit_probabilities_multiple_agents(incoming_transaction)
-    #
-    #     all_tips = []
-    #
-    #     for agent in self.agents:
-    #
-    #         #Get visible transactions and valid tips (and record these)
-    #         self.get_visible_transactions(incoming_transaction.arrival_time + self.latency, agent)
-    #         valid_tips = self.get_valid_tips_multiple_agents(agent)
-    #
-    #         for i in range(100):
-    #             tip = self.weighted_random_walk(incoming_transaction, valid_tips)
-    #             all_tips.append(tip.agent)
-    #
-    #     print(all_tips)
-    #     c = Counter(all_tips)
-    #     perc = [(i, c[i] / len(all_tips) * 100.0) for i in c]
-    #
-    #     return perc

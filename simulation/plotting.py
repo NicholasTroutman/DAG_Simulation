@@ -202,7 +202,6 @@ def print_coordinates(self, agents, time):
     
     
 ##NT: print_position of agents overtop backgroundimg
-
 ##NT: print_position of agents
 def print_coordinates_img(self, agents, time, backgroundImg):
 
@@ -265,6 +264,108 @@ def print_coordinates_img(self, agents, time, backgroundImg):
     
     for i, label in enumerate(labels):
         plt.annotate(label,[posx[i],posy[i]])
+    #plt.xlim(0,backgroundImg.shape[1])
+    #plt.ylim(0,backgroundImg.shape[0])
+    #Save the graph
+    plt.savefig(f'./img/CG_{time}.png')
+    #plt.close()
+    #plt.show() 
+    
+    ##end program
+    #sys.exit()
+
+
+
+def print_coordinates_img_including_baseStations(self, agents, baseStations, time, backgroundImg):
+
+    colors = cm.rainbow(np.linspace(0, 1, len(agents)))
+
+    ##NT: get agents coordinates into posx and posy
+    posx=[]
+    posy=[]
+    
+    #Creating figure
+    plt.figure(2,figsize=(14, 7))
+    plt.cla()
+    ax = plt.gca()
+    plt.imshow(backgroundImg)
+    
+    #agents
+    for index, agent in enumerate(agents):
+        linex=[]
+        liney=[]
+       
+        posx.append(agent.coordinates[0])
+        posy.append(agent.coordinates[1])
+        
+        #print(index,": curr Pos: ",str(agent.coordinates))
+        #get linegraph
+        for coordinates in agent.past_coordinates:
+            linex.append(coordinates[0])
+            liney.append(coordinates[1])
+            #print(coordinates)
+        
+        plt.plot(linex,liney,color=colors[index]) #past positions
+        
+        #plot radius
+        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),60, color='black', fill=False)
+        ax.add_artist(circle)
+        
+        if time>0:
+            curX = [linex[-1],agent.coordinates[0]]
+            curY = [liney[-1],agent.coordinates[1]]
+            plt.plot(curX, curY, color=colors[index]) #print current pos
+        
+        
+    ##Get agent labels:
+    labels=[]
+    for i in range(0,len(agents)):
+        labels.append("Agent "+str(i+1))
+                
+
+    bsPosx=[]
+    bsPosy=[]
+    ##baseStations
+    for index, bs in enumerate(baseStations):
+               
+        bsPosx.append(bs.coordinates[0])
+        bsPosy.append(bs.coordinates[1])
+        #print(bs)
+        #print(bs.coordinates[0])
+        #print(bs.coordinates[1])
+         #plot radius
+        circle=plt.Circle((bs.coordinates[0],bs.coordinates[1]),60, color='black', fill=False)
+        ax.add_artist(circle)
+        plt.plot(bs.coordinates[0], bs.coordinates[1], color=colors[index]) #print current pos
+       
+     
+    ##Get baseStation labels:
+    bsLabels=[]
+    for i in range(0,len(baseStations)):
+        bsLabels.append("Base Station "+str(i+1))           
+
+
+    #create scatterplot
+    #for i in range(0,len(agents)): #check
+    #    print("Agent:  ",i," ",agents[i].coordinates[0],", ",agents[i].coordinates[1])
+    #    print(posx[i],", ",posy[i])
+    
+        
+    plt.scatter(posx,posy,color=colors, s=250)
+    #Print title
+    title = "Transactions = " + str(self.no_of_transactions) + ", Time: " + str(time)
+    plt.xlabel("X axis Coordinates")
+    plt.ylabel("Y axis Coordinates")
+    plt.title(title)
+    
+    for i, label in enumerate(labels):
+        plt.annotate(label,[posx[i],posy[i]])
+
+
+
+    for i, label in enumerate(bsLabels):
+        plt.annotate(label,[bsPosx[i],bsPosy[i]])
+        #plt.annotate(bsLabels,[bsPosx,bsPosy[i]])
     #plt.xlim(0,backgroundImg.shape[1])
     #plt.ylim(0,backgroundImg.shape[0])
     #Save the graph

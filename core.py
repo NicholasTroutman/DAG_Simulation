@@ -4,7 +4,7 @@ import scipy.stats as st
 import networkx as nx
 import matplotlib.pyplot as plt
 import sys, getopt
-from simulation.block import block
+from simulation.block import Block
 from simulation.helpers import update_progress, csv_export, create_random_graph_distances
 from simulation.plotting import print_graph, print_tips_over_time, \
 print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, \
@@ -24,9 +24,13 @@ alpha = 0.01
 txs = 400
 printing=True
 seed=10
+map='DCRedBlue.png' #default map
+
+
+
 ##Commands --alpha/-a, --txs/-t, --netsize/-n, --lambda/-l
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed ="]
-opts, args = getopt.getopt(sys.argv[1:], "atnlp:s:", commands)
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "map ="]
+opts, args = getopt.getopt(sys.argv[1:], "atnlps:m:", commands)
 for opt, arg in opts:
     if opt in ('-a', '--alpha '):
         alpha= float(arg)
@@ -52,7 +56,10 @@ for opt, arg in opts:
         #print("PRINTING FOUND AND WILL BE CHANGED!!!", arg," ",bool(arg))
         #print("Lambda Found")
         seed=int(arg)
-        
+    elif opt in ('-m', '--map '):
+        #print("Arg is ",arg)
+        map = arg #save map
+
         
 print("Alpha: ", alpha)
 print("Txs: ", txs)
@@ -60,6 +67,7 @@ print("Netize: ", netsize)
 print("Lambda: ", lam_m)
 print("Printing: ", printing)
 print("Seed: ", seed)
+print("Map: ", map)
 #sys.exit()
 #############################################################################
 # SIMULATION: SINGLE AGENT
@@ -106,10 +114,11 @@ for lam in my_lambda:
                                 _no_of_agents = netsize,_alpha = alpha,
                                 _distance = 1, _tip_selection_algo = tsa,
                                 _latency=1, _agent_choice=None, 
-                                _printing=printing, _lambda_m=lam_m, _seed=seed)
+                                _printing=printing, _lambda_m=lam_m, _seed=seed, _map=map)
     simu2.setup()
     simu2.run()
     file_name = os.path.join(dir_name, base_name + suffix)
+    print("SAVING DATA: ",file_name)
     csv_export(simu2, file_name)
 
 print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")

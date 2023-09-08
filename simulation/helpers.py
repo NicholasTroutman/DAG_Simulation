@@ -177,6 +177,7 @@ def load_file(filename):
     return data
 
 
+#exports simulation_multi_agent object to csv file after setup+run
 def csv_export(self, file_name):
 
     with open(file_name, 'w', newline='') as file:

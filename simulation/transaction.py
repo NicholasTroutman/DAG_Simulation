@@ -7,13 +7,13 @@ class Transaction:
             self.agent = None
             self.seen=[""]*_numAgents#list where index=agent and value=time seen, for latency statistics
 
-            #For tip selection and calculating confirmation_confidence
-            self.cum_weight = 1
-            self.cum_weight_multiple_agents  = defaultdict(lambda: 1)
-            self.exit_probability = 0
-            self.exit_probability_multiple_agents  = defaultdict(lambda: 0)
-            self.confirmation_confidence = 0
-            self.confirmation_confidence_multiple_agents = defaultdict(lambda: 0)
+            ##For tip selection and calculating confirmation_confidence
+            #self.cum_weight = 1
+            #self.cum_weight_multiple_agents  = defaultdict(lambda: 1)
+            #self.exit_probability = 0
+            #self.exit_probability_multiple_agents  = defaultdict(lambda: 0)
+            #self.confirmation_confidence = 0
+            #self.confirmation_confidence_multiple_agents = defaultdict(lambda: 0)
 
             #For performance statistics
             self.weight_update_time = 0
