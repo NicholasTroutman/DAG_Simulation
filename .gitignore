@@ -1,8 +1,8 @@
 # python cache
 *.pyc
-*.csv
+#*.csv
 *.gif
-*.png
+/img/*.png
 # virtual env
 venv
 
