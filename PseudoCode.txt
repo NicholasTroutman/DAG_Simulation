@@ -1,0 +1,43 @@
+
+##Nearby Block-Creation Algorithm
+
+
+#function to create block
+CreateBlock(listofNodes, personalData, potentialTips):
+	SendData(listofNodes, personalData, potentialTips)
+	newData, newTips=RecieveData(listofNodes, potentialTips)
+	
+	potentialTips=newData+newTips
+	verifiedData=Verify(newData)
+	
+	if receieveValidation(listofNodes):
+		verifiedData=verifiedData+personalData
+		
+	selectedTips=tipSelectionAlgorithm(potentialTips)
+	
+	newBlock=[selectedTips, verifiedData]
+	
+	return newBlock
+
+numNearbyNodes=0
+nearbyNodes=[]
+criticalMass=10
+
+
+while True:
+	sendPing(hash(currentChain)) #ping all members
+	nearbyNodes, unsychronizedChains =recieveResponses() #respond to pings
+	
+	synchronizedChain = SyncChains(currentChain,unsychronizedChains, nearbyNodes) #synchronize chains with nearby nodes
+	
+	numNearbyNodes=len(nearbyNodes) 
+	
+	
+	if numNearbyNodes>criticalMass: #Make newBlock
+		newBlock=CreateBlock(nearbyNodes, newPersonalData) 
+        
+        
+        
+        
+		
+			

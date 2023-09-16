@@ -16,13 +16,13 @@ class Block:
         self.id = blockCounter
         self.blockLinks  = [blockLinks]
         self.seen = [""]*numAgents
-        
+
     def __str__(self):
         return str(self.id)
 
     def __repr__(self):
         return str(self.id)
-   
+
 
 class BaseStationBlock:
     def __init__(self, txs, creationTime, blockCounter, numAgents, prevBlock): #list of txs and agents
@@ -33,7 +33,7 @@ class BaseStationBlock:
         #self.blockLinks  = []
         self.seen = [""]*numAgents
         self.blockLinks = [prevBlock] #will realistically be only 1 link but this is the standardized format
-        
+
     def __str__(self):
         return str(self.id)
 

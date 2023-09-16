@@ -4,7 +4,7 @@ import scipy.stats as st
 import networkx as nx
 import matplotlib.pyplot as plt
 import sys, getopt
-from simulation.block import block
+from simulation.block import Block
 from simulation.helpers import update_progress, csv_export, create_random_graph_distances
 from simulation.plotting import print_graph, print_tips_over_time, \
 print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, \

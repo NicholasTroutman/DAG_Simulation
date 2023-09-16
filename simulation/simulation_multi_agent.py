@@ -12,11 +12,11 @@ from operator import add
 
 from simulation.helpers import update_progress, create_distance_matrix, \
 common_elements, clamp, load_file, create_coordinates, create_coordinates_nodes
-from simulation.mapMaker import Distance, DistanceToVector, FindCenter, FindEdges, IdentfiyBlueEdgeIntersection,  LoadImageIntoGraph, isBetween
+from simulation.mapMaker import Distance, DistanceToVector,  FindEdges, IdentfiyBlueEdgeIntersection,  LoadImageIntoGraph, isBetween #FindCenter
 from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents
 from simulation.agent import Agent
 from simulation.transaction import Transaction
-from simulation.block import block
+from simulation.block import Block
 
 
 class Multi_Agent_Simulation:
@@ -72,7 +72,7 @@ class Multi_Agent_Simulation:
         self.agents = []
         self.arrival_times = []
         self.not_visible_transactions = []
-        
+
         ##block variables
         self.blocks=[]
 
@@ -111,35 +111,35 @@ class Multi_Agent_Simulation:
         #Create directed graph object
         self.DG = nx.DiGraph()
         self.traffic, self.backgroundImg= LoadImageIntoGraph('DCredblue.png') #hardcoded image, graph and image saved
-        
+
         print("Traffic: ",self.backgroundImg.shape)
-        
+
         #create travelling sales person (TSPTSP)
         self.tsp = nx.approximation.traveling_salesman_problem
         #Create agent coordinates & destination
         create_coordinates_nodes(self.agents, self.traffic, self.tsp)
-    
+
         #Create random arrival times
         inter_arrival_times = np.random.exponential(1 / self.lam, self.no_of_transactions)
         self.arrival_times = list(np.cumsum(inter_arrival_times))
-        
+
         #if milestone issue rate is not zero, calculate number of milestones
         if self.lam_m != 0:
             num_of_milestones = int((self.no_of_transactions / self.lam) * self.lam_m)
             self.total_num_tx += num_of_milestones
             for i in range(num_of_milestones):
                 self.arrival_times.append((1/self.lam_m)*(i+1))
-        
+
         self.arrival_times.sort()
 
         #Create genesis transaction object, store in list and add to graph object
         transaction_counter = 0
         self.transactions.append(Transaction(0, transaction_counter, self.no_of_agents))
         #print("genesis: ",self.transactions[0].seen)
-        
+
         #for count, seenTime in enumerate(self.transactions[0].seen):
         #    self.transactions[0].seen[count]=0
-            
+
         #self.DG.add_node(self.transactions[0], pos=(0, 0), no=transaction_counter, node_color='#99ffff')
 
         transaction_counter += 1
@@ -148,10 +148,10 @@ class Multi_Agent_Simulation:
         for i in range(len(self.arrival_times)):
             self.transactions.append(Transaction(self.arrival_times[i], transaction_counter, self.no_of_agents)) #create transactions + seen list
             transaction_counter += 1
-            
-            
-            
-            
+
+
+
+
         ##set up PRNG routes
         #number of routes/sim 1/50*2 1/25 -->txs/4 is destinations
         numDest = self.no_of_transactions/4
@@ -162,15 +162,15 @@ class Multi_Agent_Simulation:
                 #set new TSP path
                 #print("TSP RESULT: ",self.tsp(self.traffic, nodes=[newDest, agent.destination[-1]], cycle=False)[1:])
                 agent.destination.extend(self.tsp(self.traffic, nodes=[newDest, agent.destination[-1]], cycle=False)[1:])
-                
+
                 #print("Agent: ",agent.id," Destination ",i,": ",agent.destination)
                 #set slope and vector
                 if i==0:
-                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ] 
-                
+                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ]
+
                     agent.vector=streetSlope/np.linalg.norm(streetSlope)
-    
-        
+
+
 
 
         #Move all agents
@@ -179,16 +179,16 @@ class Multi_Agent_Simulation:
             agent.past_coordinates.append(agent.coordinates)
             ##old system random walk
             #agent.coordinates=agent.coordinates + np.random.normal(0,6,2)*(transaction.arrival_time-prevTime)
-            
+
             #new system directed TSP
             #Speed/second
             speed = agent.speed
             scalar=(arrival_time-prevTime)*speed
             vector = [v*scalar for v in agent.vector]
             newCoord = list( map(add, agent.coordinates, vector) )
-           
-            
-            
+
+
+
             if (isBetween(newCoord, self.traffic.nodes[agent.destination[0]]['pos'], agent.coordinates)==False): #epsilon=0.5, if true, then not between
                 agent.coordinates=newCoord
             else: #overshot, new coordinates are agent.destination[0]
@@ -198,32 +198,32 @@ class Multi_Agent_Simulation:
                     #new destination
                     agent.destination=agent.destination[1:]
                     #set slope and vector
-                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ] 
-                    
+                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ]
+
                     agent.vector=streetSlope/np.linalg.norm(streetSlope)
-                    
-                    
+
+
                 else: #reached terminus, make new destinations
                     #print("NEW DESTINATION")
                     newDest=np.random.choice([x for x in self.traffic.nodes if x!=agent.prev_dest])
                     #set new TSP path
                     agent.destination=self.tsp(self.traffic, nodes=[newDest, agent.prev_dest], cycle=False)[1:]
                     #set slope and vector
-                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ] 
-                    
+                    streetSlope=[ self.traffic.nodes[agent.destination[0]]['pos'][0]- self.traffic.nodes[agent.prev_dest]['pos'][0],  self.traffic.nodes[agent.destination[0]]['pos'][1] - self.traffic.nodes[agent.prev_dest]['pos'][1]  ]
+
                     agent.vector=streetSlope/np.linalg.norm(streetSlope)
-                    
-            
+
+
             #If coordinates are outside boundaries [0,backgroundImg.shape[0]] bounce them back in, 101-->99, -1-->1. bounce around boundary, not pacman
             if agent.coordinates[0]>self.backgroundImg.shape[0] or agent.coordinates[0]<0:
                 agent.coordinates[0]=-1*agent.coordinates[0]%self.backgroundImg.shape[0] #100 MAGIC NUMBER
             if agent.coordinates[1]>self.backgroundImg.shape[1] or agent.coordinates[1]<0:
                                 agent.coordinates[1]=-1*agent.coordinates[1]%self.backgroundImg.shape[1] #MAGIC NUMBER
-           
+
 
     def cleanOldTxsAndBlocks(self, transaction):
         if (transaction.id >= 0 and transaction.id % 400 == 0):
-                
+
                 ##remove old txs
                 for agent in self.agents:
                     saveTxs=[]
@@ -231,15 +231,15 @@ class Multi_Agent_Simulation:
                     #print("DEBUG Vis Txs:\t")
                     #for vtxs in vis_txs:
                      #   print(vtxs.__class__.__name__ , end =", "))
-                       
+
                     #print("\n")
                     for count, tx in enumerate(agent.get_visible_transactions()):
                         #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
                         if transaction.arrival_time - tx.arrival_time < 400: ##MAGIC NUMBER 400
                             saveTxs.append(tx)
-                            
+
                     agent._visible_transactions=saveTxs #TODO: using _visible_transactions is iffy, maybe turn into function?
-                
+
                 ##remove old blocks
                 for agent in self.agents:
                     saveBlocks=[]
@@ -261,25 +261,25 @@ class Multi_Agent_Simulation:
 
         if self.printing:
             print_info(self)
-    
+
         #Create dictionary with simulation parameter changes when provided
         #if(len(sys.argv) == -1):
         #    dic = {x[0]: x[1:] for x in self.config[1:]}
         prevTime=0
-        
-        
+
+
         ##save coordinates in figure
         print_coordinates_img(self,self.agents,0, self.backgroundImg)
-        
-        
+
+
         #append genesis transaction block to users
         #for agent in self.agents:
             #agent.add_visible_transactions([self.transactions[0]], 0)
-            #visible_transactions.append(self.transactions[0]) 
-        
+            #visible_transactions.append(self.transactions[0])
+
         for s in self.transactions[0].seen:
             s=0 #set seen for everyone at 0
-                
+
         ##Start loop
         #Start with first transaction (NOT genesis)
         #for transaction in self.transactions[1:]: ##Loop for each tx
@@ -292,28 +292,28 @@ class Multi_Agent_Simulation:
             while self.transactions[currentTx].arrival_time < i: #has this tx been minted
                 mintedTxs.append(self.transactions[currentTx]) #if so add to mintedTxs
                 currentTx +=1 #check next Tx
-            
+
 
 
 
 
             ##Move agents
             self.moveAgents(i, prevTime)
-               
-                            
-            ##Do something every 400 to clean visible_transactions
-            
 
-            
+
+            ##Do something every 400 to clean visible_transactions
+
+
+
             #mint Txs
             for transaction in mintedTxs: #for each minted tx since last time increment:
                 transaction.agent = np.random.choice(self.agents, p=self.agent_choice) #choose agent
                 transaction.agent.add_visible_transactions([transaction],  transaction.arrival_time) #add tips to minted tx
                 self.cleanOldTxsAndBlocks(transaction) ##Do something every 400 to clean visible_transactions
 
-            ##exchange transactions           
+            ##exchange transactions
             self.transfer_txs_and_blocks(self.agents,  transaction.arrival_time)
-            
+
 
 
             #Add transaction to directed graph object (with random y coordinate for plotting the graph)
@@ -322,19 +322,19 @@ class Multi_Agent_Simulation:
                 #node_color=self.agent_colors[transaction.agent.id])
 
             start_selection = time.time() #timing for analysis
-           
+
            #Select tips
             #self.tip_selection(transaction)
-            
+
             #append transacion to visible transactions
             #transaction.agent.add_visible_transactions([transaction], transaction.arrival_time)
-            
+
             #ts_time = np.round(time.time() - start_selection, 5)
             #transaction.set_tip_selection_time(ts_time)
 
             #start_update_weight = time.time()
-            
-            
+
+
             #Update weights (of transactions referenced by the current transaction)
             #if("weighted-" in self.tip_selection_algo):
             #    self.update_weights_multiple_agents(transaction)
@@ -348,7 +348,7 @@ class Multi_Agent_Simulation:
             #Progress bar update
             #if self.printing:
             #    update_progress(transaction.id/self.total_num_tx, transaction)
-            
+
             update_progress(i/endTime, i)
             #prevTime=transaction.arrival_time ##old system whereby tx.arrival_time was increment
             prevTime=i-1 #last second
@@ -357,7 +357,7 @@ class Multi_Agent_Simulation:
             ##save coordinates in frame for gif making later
             if self.printing:
                 print_coordinates_img(self,self.agents, i , self.backgroundImg)
-            
+
             ##print temporary graph of the system before it is done
            # if (transaction.id==30):
            #     print_graph_temp(self) #temp graph
@@ -379,10 +379,10 @@ class Multi_Agent_Simulation:
         if self.printing:
             print("Calculation time further measures: " + str(np.round(timeit.default_timer() - start_time2, 3)) + " seconds\n")
             #print("\nGraph information:\n" + nx.info(self.DG))
-            
-                
- 
-            
+
+
+
+
             print("PRINT GIF")
             print_gif(self, self.transactions) ##create gif
             print("DONE PRINTING")
@@ -458,7 +458,7 @@ class Multi_Agent_Simulation:
                 else:
                     #Get distance from agent to agent of transaction from distance matrix
                     #distance = self.distances[agent.id][transaction.agent.id] #old distance 2d matrix
-                    
+
                     distance = math.hypot(agent.coordinates[0] - tx_x, agent.coordinates[1] - tx_y)
                     #Determine if the transaction is visible (incoming_transaction.arrival_time determines current time)
                     if (transaction.arrival_time + self.latency + distance <= incoming_transaction_time):
@@ -473,20 +473,20 @@ class Multi_Agent_Simulation:
  ##Create block between N agents within close proximity
     def create_block_nearby(self, agents, time): #radius=distance for tx transfer,
         print("\nCREATING BLOCK\n")
-        
-        
+
+
         print("Agents: ",agents)
         ##get all txs
         txs=[]
         for agent in agents:
             print("AGENT TXS: ",agent.get_visible_transactions())
             txs = list(set(txs) | set(agent.get_visible_transactions())) ##combine all freeTxs
-        
+
         print("TX Unions: ",txs)
         if txs==[]:
             print("No Txs for block")
             return
-        
+
         ##get links
         visBlocks=[]
         for agent in agents:
@@ -494,28 +494,28 @@ class Multi_Agent_Simulation:
 
         print("Block #: ", len(self.blocks))
         print("NumBlocks #: ",self.DG.number_of_nodes())
-        newBlock = block(txs, agents, time, len(self.blocks), self.no_of_agents)
+        newBlock = Block(txs, agents, time, len(self.blocks), self.no_of_agents, None) #None for no new blockLinks (yet)
         self.blocks.append(newBlock)
         for agent in agents:
             agent.usedTxs=txs
             agent.freeTxs=[]
-        
+
         self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
                 np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
                 node_color=self.agent_colors[newBlock.creators[0].id])
-        
-        
+
+
         #choose tsa
         self.tip_selection(newBlock)
         for agent in agents:
             agent.add_visible_blocks([newBlock], time)
-            
-            
-            
-            
-            
-            
-     
+
+
+
+
+
+
+
     ##TODO: transfer transactions and blocks within radius
     def transfer_txs_and_blocks(self,agents, time): #radius=distance for tx transfer,
     #def transfer_transactions(self,agents, time): #radius=distance for tx transfer,
@@ -538,33 +538,33 @@ class Multi_Agent_Simulation:
                         if distance<radius:  #neighbors
                             neighborsCount += 1
                             neighbors.append(agents[i])
-                        
+
                             ##trade blocks
                             #agents[index].add_visible_transactions(agents[i].get_visible_blocks())
                             #agents[i].add_visible_transactions(agents[index].get_visible_blocks())
 
                             indexTxs = agents[index].get_visible_blocks()
                             iTxs = agents[i].get_visible_blocks()
-                            
+
                             agents[index].add_visible_blocks(iTxs, time)
                             agents[i].add_visible_blocks(indexTxs, time)
-                            
+
                             ##trade txs
                             indexVisibleTxs = agents[index].get_visible_transactions()
                             iVisibleTxs = agents[i].get_visible_transactions()
-                            
+
                             agents[index].add_visible_transactions(iVisibleTxs, time)
                             agents[i].add_visible_transactions(indexVisibleTxs, time)
-                            
+
             ##localBlock necessity
             if neighborsCount > 2: #2
                 self.create_block_nearby(neighbors,  time)
 
 
-      
 
-                
-                
+
+
+
     #returns valid tips for a given agent
     def get_valid_tips_multiple_agents(self, agent):
 
@@ -582,7 +582,7 @@ class Multi_Agent_Simulation:
                 #Add to valid tips if transaction has no approvers at all
                 #print(len(list(self.DG.predecessors(transaction))))
                 if(len(list(self.DG.predecessors(b))) == 0):
-                    valid_tips.append(b) 
+                    valid_tips.append(b)
 
                 #Add to valid tips if all approvers not visible yet
                 #elif(self.all_approvers_not_visible(transaction)):
@@ -593,7 +593,7 @@ class Multi_Agent_Simulation:
                 elif(len(set(list(self.DG.predecessors(b))).intersection(set(agent.get_visible_blocks()))) == 0): #if no predecssors of tx are in visible transaction
                     #print("\n\n!!!!!!! HASN'T SEEN NEW LINK YET !!!!\n\n")
                     valid_tips.append(b)
-            
+
         return valid_tips
 
 
@@ -633,8 +633,8 @@ class Multi_Agent_Simulation:
         valid_tips = self.get_valid_tips_multiple_agents(block.creators[0])
         block.creators[0].record_tips.append(valid_tips)
         self.record_tips.append(valid_tips)
-        
-        
+
+
         ##error check print all transactions
         #print("\nAvailable Txs")
         #for tx in transaction.agent.visible_transactions:
@@ -646,11 +646,11 @@ class Multi_Agent_Simulation:
         valid_tips2 = valid_tips.copy() #create copy to edit
         print("Valid Tips: ",valid_tips2)
         for count, tip in enumerate(valid_tips):
-            if count>7: #no more than 8 tips 
+            if count>7: #no more than 8 tips
                 break
             tempTip = np.random.choice(valid_tips2) #get randomTip
             self.DG.add_edge(block, tempTip) #add tip
-            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
+            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2
             block.blockLinks.append(tempTip)
 
     #############################################################################
@@ -664,7 +664,7 @@ class Multi_Agent_Simulation:
             high = transaction.id - 100*self.lam
             tx_idx = np.random.randint(low=low, high=high)
         return self.transactions[tx_idx]
-            
+
 
     #############################################################################
     # TIP-SELECTION: UNWEIGHTED
@@ -678,7 +678,7 @@ class Multi_Agent_Simulation:
         #        self.get_visible_transactions(transaction.arrival_time, agent)
         #        valid_tips = self.get_valid_tips_multiple_agents(agent)
         #        agent.record_tips.append(valid_tips)
-        
+
         valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
         transaction.agent.record_tips.append(valid_tips)
         self.record_tips.append(valid_tips)
@@ -688,19 +688,19 @@ class Multi_Agent_Simulation:
         #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
         transaction.agent.record_tips.append(valid_tips)
         self.record_tips.append(valid_tips)
-        
-        
+
+
         valid_tips2=valid_tips.copy() #create copy to edit
-        
+
         for count, tip in enumerate(valid_tips):
-            if count>7: #no more than 8 tips 
+            if count>7: #no more than 8 tips
                 break
             #tempTip = np.random.choice(valid_tips2) #get randomTip
             tempTip = self.unweighted_random_walk(transaction, valid_tips2)
             self.DG.add_edge(transaction, tempTip) #add tip
-            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
-            
-            
+            valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2
+
+
         #Walk to two tips
         #tip1 = self.unweighted_random_walk(transaction, valid_tips)
         #tip2 = self.unweighted_random_walk(transaction, valid_tips)
@@ -750,8 +750,8 @@ class Multi_Agent_Simulation:
         #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
         #transaction.agent.record_tips.append(valid_tips)
         #self.record_tips.append(valid_tips)
-        
-        
+
+
         #Collect valid tips and record them
         valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
         transaction.agent.record_tips.append(valid_tips)
