@@ -2,7 +2,7 @@
 *.pyc
 #*.csv
 *.gif
-/img/*.png
+/img/CG_*.png
 # virtual env
 venv
 
@@ -13,8 +13,9 @@ venv
 .vscode/
 
 # simulation data
-SimuData/
-img/
+
+
+
 # DS_Store
 .DS_Store
 indirect_refs.csv
