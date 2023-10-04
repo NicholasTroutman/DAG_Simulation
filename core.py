@@ -4,7 +4,7 @@ import scipy.stats as st
 import networkx as nx
 import matplotlib.pyplot as plt
 import sys, getopt
-from simulation.block import Block
+#from simulation.block import Block
 from simulation.helpers import update_progress, csv_export, create_random_graph_distances
 from simulation.plotting import print_graph, print_tips_over_time, \
 print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, \
@@ -24,9 +24,13 @@ alpha = 0.01
 txs = 400
 printing=True
 seed=10
+DLTMode = "linear" #linear, dag, dht
+consensus = "individual" #individual, nearby
+
+
 ##Commands --alpha/-a, --txs/-t, --netsize/-n, --lambda/-l
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed ="]
-opts, args = getopt.getopt(sys.argv[1:], "atnlp:s:", commands)
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus ="]
+opts, args = getopt.getopt(sys.argv[1:], "atnlpsd:c:", commands)
 for opt, arg in opts:
     if opt in ('-a', '--alpha '):
         alpha= float(arg)
@@ -43,6 +47,7 @@ for opt, arg in opts:
     elif opt in ('-p', '--printing '):
         #print("PRINTING FOUND AND WILL BE CHANGED!!!", arg," ",bool(arg))
         #print("Lambda Found")
+        p = str(arg).lower()
         if arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
             printing=False
         else:
@@ -52,14 +57,24 @@ for opt, arg in opts:
         #print("PRINTING FOUND AND WILL BE CHANGED!!!", arg," ",bool(arg))
         #print("Lambda Found")
         seed=int(arg)
-        
-        
+
+    elif opt in ('-d', '--dhtmode '):
+        DLTMode = str(arg).lower()
+        if (DLTMode not in  ["linear", "dag", "dht"]   ):
+            DLTMode = "linear"
+    elif opt in ('-c', '--consensus '):
+        consensus = str(arg).lower()
+        if (consensus not in  ["individual", "near"]   ):
+            consensus = "individual"
+
 print("Alpha: ", alpha)
 print("Txs: ", txs)
 print("Netize: ", netsize)
 print("Lambda: ", lam_m)
 print("Printing: ", printing)
 print("Seed: ", seed)
+print("DLTMode: ",DLTMode)
+print("Consensus: ",consensus)
 #sys.exit()
 #############################################################################
 # SIMULATION: SINGLE AGENT
@@ -103,10 +118,10 @@ for lam in my_lambda:
     base_name = '{}alpha_{}lam_{}_txs_{}_tsa_{}_size_{}' \
                 .format(timestr, alpha, lam, txs, tsa, netsize)
     simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
-                                _no_of_agents = netsize,_alpha = alpha,
+                                _no_of_agents = netsize, _alpha = alpha,
                                 _distance = 1, _tip_selection_algo = tsa,
-                                _latency=1, _agent_choice=None, 
-                                _printing=printing, _lambda_m=lam_m, _seed=seed)
+                                _latency=1, _agent_choice=None,
+                                _printing=printing, _lambda_m=lam_m, _seed=seed, _DLTMode=DLTMode, _consensus=consensus)
     simu2.setup()
     simu2.run()
     file_name = os.path.join(dir_name, base_name + suffix)
