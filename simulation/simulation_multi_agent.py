@@ -151,6 +151,8 @@ class Multi_Agent_Simulation:
 
         for agent in self.agents: #add to vis blocks for everyone
             agent.add_visible_blocks([self.blocks[0]], 0)
+
+
         self.DG.add_node(self.blocks[0], pos=(self.blocks[0].creation_time, \
                 np.random.uniform(0, 1)+self.blocks[0].creators[0].id*2), \
                 node_color=self.agent_colors[self.blocks[0].creators[0].id])
@@ -384,6 +386,7 @@ class Multi_Agent_Simulation:
                         newBlock = self.createBlock(txs, [mintingAgent], self.block_arrival_times[currentBlock], len(self.blocks), self.no_of_agents, None)
                         self.blocks.append(newBlock)
 
+
                         #use up txs
                         mintingAgent.usedTxs = txs
                         mintingAgent.freeTxs = []
@@ -396,12 +399,16 @@ class Multi_Agent_Simulation:
 
                         #choose tsa
                         self.tip_selection(newBlock)
-                        mintingAgent.add_visible_blocks([newBlock], time)
+
+                        print("\nvis_blocks b4:\t",mintingAgent.get_visible_blocks())
+                        mintingAgent.add_visible_blocks([newBlock], i)
+                        print("vis_blocks b4:\t",mintingAgent.get_visible_blocks())
+
 
                         #advance currentBlock
                         currentBlock+=1
                         if currentBlock <=len(self.block_arrival_times):
-                            break #done with this 
+                            break #done with this
 
                     #Block(txs, agents, time, len(self.blocks), self.no_of_agents, None) #None for no new blockLinks (yet)
 
@@ -630,11 +637,13 @@ class Multi_Agent_Simulation:
                             #agents[index].add_visible_transactions(agents[i].get_visible_blocks())
                             #agents[i].add_visible_transactions(agents[index].get_visible_blocks())
 
-                            indexTxs = agents[index].get_visible_blocks()
-                            iTxs = agents[i].get_visible_blocks()
+                            indexBlocks = agents[index].get_visible_blocks()
+                            iBlocks = agents[i].get_visible_blocks()
 
-                            agents[index].add_visible_blocks(iTxs, time)
-                            agents[i].add_visible_blocks(indexTxs, time)
+                            print("\nvis Blocks:\t",indexBlocks)
+
+                            agents[index].add_visible_blocks(iBlocks, time)
+                            agents[i].add_visible_blocks(indexBlocks, time)
 
                             ##trade txs
                             indexVisibleTxs = agents[index].get_visible_transactions()
@@ -644,8 +653,8 @@ class Multi_Agent_Simulation:
                             agents[i].add_visible_transactions(indexVisibleTxs, time)
 
             ##localBlock necessity
-            if neighborsCount > 2: #need 3 total nearby nodes
-                if self.consensus == "near":
+            if self.consensus == "near":
+                if neighborsCount > 2: #need 3 total nearby
                     self.create_block(neighbors,  time) #create block with nearby nodes
 
 

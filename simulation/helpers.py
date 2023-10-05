@@ -7,7 +7,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-#create agent 
+#create agent
 
 #NT: Create random coordinates for each agent
 def create_coordinates(agents, maxDistance,):
@@ -21,10 +21,10 @@ def create_coordinates_nodes(agents, graph, tsp):
         #print(agent,": ",origin)
         agent.coordinates = graph.nodes[begin]['pos']
         agent.prev_dest = begin
-        agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set 
-        
-        streetSlope=[ graph.nodes[agent.destination[0]]['pos'][0]- graph.nodes[begin]['pos'][0],  graph.nodes[agent.destination[0]]['pos'][1] - graph.nodes[begin]['pos'][1]  ]   
-        
+        agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set
+
+        streetSlope=[ graph.nodes[agent.destination[0]]['pos'][0]- graph.nodes[begin]['pos'][0],  graph.nodes[agent.destination[0]]['pos'][1] - graph.nodes[begin]['pos'][1]  ]
+
         agent.vector=streetSlope/np.linalg.norm(streetSlope)
         #print(agent.vector)
 
@@ -182,7 +182,7 @@ def csv_export(self, file_name):
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
-        
+
         header=['txID', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
@@ -192,24 +192,26 @@ def csv_export(self, file_name):
                 header.append(str("agent_"+str(agentId+1)))
             break
         print(header)
-        writer.writerow(header) #add confirmation time + 
+        writer.writerow(header) #add confirmation time +
         #Write genesis
         #writer.writerow([0,[],0, '', 0, 0])
-        for transaction in self.DG.nodes:
+        for block in self.DG.nodes:
             #Write all other transactions
-            if(transaction.creation_time != 0):
-                line = []
-                line.append(transaction.id) #txid
-                line.append(list(self.DG.successors(transaction))) #tips
-                line.append(transaction.creation_time) #arrival_time
-                line.append(transaction.creators) ##int(transaction.creators[0].id)+1) #agent
-                
-                
-                #line.append(0) ##line.append(transaction.tip_selection_time
-                #line.append(0) ## line.append(transaction.weight_update_time)
-                line.append(len(list(nx.descendants(self.DG, transaction)))/(transaction.id+0.001)) #adoption_rate
-                line.append(transaction.blockTransactions)
-                for agentSeen in transaction.seen:
-                    line.append(agentSeen)
-                writer.writerow(line)
+            #if(block.creation_time != 0):
+            print("\nBlock:\t",block.id,"\t",block.creation_time)
+            print("creator:\t",block.creators)
+            line = []
+            line.append(block.id) #txid
+            line.append(list(self.DG.successors(block))) #tips
+            line.append(block.creation_time) #arrival_time
+            line.append(block.creators) ##int(transaction.creators[0].id)+1) #agent
 
+
+            #line.append(0) ##line.append(transaction.tip_selection_time
+            #line.append(0) ## line.append(transaction.weight_update_time)
+            line.append(len(list(nx.descendants(self.DG, block)))/(block.id+0.001)) #adoption_rate
+            line.append(block.blockTransactions)
+            for agentSeen in block.seen:
+                line.append(agentSeen)
+                print("agentSeen:\t",agentSeen)
+            writer.writerow(line)

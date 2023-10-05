@@ -67,22 +67,25 @@ class Node:
 
     ##Block functions
     def add_visible_blocks(self, new_blocks, time): #no return
-    #print("\nadd_vis_trans begin: ", time)
-    #print("new: ",new_blocks)
-    #print("old: ",self._visible_transactions)
+        print("\nadd_vis_trans begin: ", time)
+        print("new: ",new_blocks)
+        print("old: ",self._visible_blocks)
 
         newest_blocks = list(set(new_blocks) - set(self._visible_blocks))
         #print("newest! :",newest_txs)
         for block in newest_blocks:
-            #print(block," ",block.seen[self.id])
+            print(block," ",block.seen[self.id])
             if block.seen[self.id] == "":
-                #print("\nUNSEEN: ", block,"\n")
+                print("\nUNSEEN: ", block,"\n")
                 block.seen[self.id] = time
                 self._visible_blocks.append(block)
-                #print("appended to vis_txs: ",self._visible_blocks)
+                print("appended to vis_txs: ",self._visible_blocks)
 
             if block in self._visible_blocks and block in self._confirmed_blocks: #remove from visible if in confirmed
                 self._visible_blocks.remove(block)
+
+
+
 
     def add_confirmed_blocks(self, new_blocks, time): #no return
     #print("\nadd_vis_trans begin: ", time)
