@@ -10,6 +10,8 @@ class BaseBlock:
         self.id = blockCounter
         #self.blockLinks  = [blockLinks] #move to implemented classes
         self.seen = [""]*numAgents
+        self.confirmed = False
+        self.confirmedBlocks = []
 
     def __str__(self):
         return str(self.id)
@@ -68,3 +70,29 @@ class BaseStationBlock:
 
     def __repr__(self):
         return str(self.id)
+
+
+
+##Function to confirm blocks N links behind block
+def confirmBlocks(block):
+    #print("\nSTART confirmBlocks:")
+    #print("CONFIRMING BLOCK")
+    confirmationNumber = 3
+
+    targetBlocks = [block]
+    for i in range(0,confirmationNumber):
+        tempBlocks = []
+        for targetBlock in targetBlocks:
+            if (targetBlock.blockLinks != None and bool(targetBlock.blockLinks) == True):
+                #print(targetBlock.blockLinks)
+                tempBlocks.append(targetBlock.blockLinks[0])
+
+        #print(tempBlocks)
+
+        targetBlocks = list(set(tempBlocks))
+        #print("CONFIRMATION Block links:\t",targetBlocks)
+    #set blocks to confirmed
+    for block in targetBlocks:
+        block.confirmed=True
+
+    block.confirmedBlocks = targetBlocks ##confirmed blocks

@@ -6,7 +6,6 @@
 def create_block_near(self, agents, time): #radius=distance for tx transfer, agents = neighbors
     print("\nCREATING BLOCK\n")
 
-
     print("Agents: ",agents)
     ##get all txs
     txs=[]
@@ -29,8 +28,7 @@ def create_block_near(self, agents, time): #radius=distance for tx transfer, age
     newBlock = Block(txs, agents, time, len(self.blocks), self.no_of_agents, None) #None for no new blockLinks (yet)
     self.blocks.append(newBlock)
     for agent in agents:
-        agent.usedTxs=txs
-        agent.freeTxs=[]
+        agent.add_submitted_transactions(txs, time)
 
     self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
          np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
@@ -40,7 +38,14 @@ def create_block_near(self, agents, time): #radius=distance for tx transfer, age
     #choose tsa
     self.tip_selection(newBlock)
     for agent in agents:
-     agent.add_visible_blocks([newBlock], time)
+        agent.add_visible_blocks([newBlock], time)
+
+    #CONFIRM Blocks
+    confirmBlocks(newBlock, time)
+
+    #move confirmed txs
+    for agent in agents:
+        agent.confirmTxs(newBlock.confirmedBlocks)
 
 
 
@@ -67,8 +72,9 @@ def create_block_individual(self, agent, time): #radius=distance for tx transfer
     self.blocks.append(newBlock)
 
     #clear out usedTxs and freeTxs
-    agent.usedTxs=txs
-    agent.freeTxs=[]
+    agent.add_submitted_transactions(txs, time)
+    #agent.usedTxs=txs
+    #agent.freeTxs=[]
 
     self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
     np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
@@ -77,5 +83,11 @@ def create_block_individual(self, agent, time): #radius=distance for tx transfer
 
     #choose tsa
     self.tip_selection(newBlock)
-    for agent in agents:
-        agent.add_visible_blocks([newBlock], time)
+
+
+
+    #CONFIRM Blocks
+    confirmBlocks(newBlock)
+
+    #add to vis_blocks list and
+    agent.add_visible_blocks([newBlock], time)

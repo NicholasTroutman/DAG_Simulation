@@ -183,7 +183,7 @@ def csv_export(self, file_name):
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
 
-        header=['txID', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
+        header=['txID', 'confirmedBlock','chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
         for transaction in self.DG.nodes:
@@ -198,10 +198,13 @@ def csv_export(self, file_name):
         for block in self.DG.nodes:
             #Write all other transactions
             #if(block.creation_time != 0):
-            print("\nBlock:\t",block.id,"\t",block.creation_time)
-            print("creator:\t",block.creators)
+            #print("\nBlock:\t",block.id,"\t",block.creation_time)
+            #print("creator:\t",block.creators)
             line = []
             line.append(block.id) #txid
+            line.append(block.confirmed)
+            line.append(block.chainNum)
+            line.append(block.confirmedBlocks)
             line.append(list(self.DG.successors(block))) #tips
             line.append(block.creation_time) #arrival_time
             line.append(block.creators) ##int(transaction.creators[0].id)+1) #agent
@@ -213,5 +216,5 @@ def csv_export(self, file_name):
             line.append(block.blockTransactions)
             for agentSeen in block.seen:
                 line.append(agentSeen)
-                print("agentSeen:\t",agentSeen)
+                #print("agentSeen:\t",agentSeen)
             writer.writerow(line)

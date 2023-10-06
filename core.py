@@ -16,7 +16,7 @@ from simulation.simulation_multi_agent import Multi_Agent_Simulation
 # GET COmmnad Line Operations
 ######
 
-tsa =  "random" #"weighted-entry-point" # weighted-entry-point, weighted-genesis, unweighted, random
+tsa =  "longest" #"weighted-entry-point" # weighted-entry-point, weighted-genesis, unweighted, random, longest
 netsize = 10
 lam_m = 1/40 #milestone rate
 

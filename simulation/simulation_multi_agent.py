@@ -16,7 +16,7 @@ from simulation.mapMaker import Distance, DistanceToVector,  FindEdges, Identfiy
 from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents
 from simulation.agent import Agent
 from simulation.transaction import Transaction
-from simulation.block import DAGBlock, LinearBlock
+from simulation.block import DAGBlock, LinearBlock, confirmBlocks
 
 
 from simulation.DLTFuncs import create_block_near, create_block_individual
@@ -288,22 +288,23 @@ class Multi_Agent_Simulation:
 
 
 
-    def tip_selection(self, transaction):
+    def tip_selection(self, block):
 
         if(self.tip_selection_algo == "random"):
-            self.random_selection(transaction)
+            self.random_selection(block)
         elif (self.tip_selection_algo == "unweighted"):
-            self.unweighted_MCMC(transaction)
+            self.unweighted_MCMC(block)
         elif (self.tip_selection_algo == "weighted-genesis"):
-            self.weighted_genesis_MCMC(transaction)
+            self.weighted_genesis_MCMC(block)
         elif (self.tip_selection_algo == "weighted-entry-point"):
-            self.weighted_entry_point_MCMC(transaction)
+            self.weighted_entry_point_MCMC(block)
         elif (self.tip_selection_algo == "longest"):
-            self.longest_selection(transaction) #actually block
+            self.longest_selection(block) #actually block
         else:
             print("ERROR:  Valid tip selection algorithms are 'random', 'weighted-genesis', 'weighted-entry-point', "
                   "'unweighted'")
             sys.exit()
+
 
 
     #############################################################################
@@ -373,7 +374,8 @@ class Multi_Agent_Simulation:
                 self.cleanOldTxsAndBlocks(transaction) ##Do something every 400 to clean visible_transactions
 
             ##exchange transactions
-            self.transfer_txs_and_blocks(self.agents,  transaction.arrival_time)
+            #self.transfer_txs_and_blocks(self.agents,  transaction.arrival_time)
+            self.transfer_txs_and_blocks(self.agents,  i)
 
             ##PoW minting
             if self.consensus == "individual":
@@ -388,8 +390,7 @@ class Multi_Agent_Simulation:
 
 
                         #use up txs
-                        mintingAgent.usedTxs = txs
-                        mintingAgent.freeTxs = []
+                        mintingAgent.add_submitted_transactions(txs, time)
 
                         #add block to DG
                         self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
@@ -399,10 +400,10 @@ class Multi_Agent_Simulation:
 
                         #choose tsa
                         self.tip_selection(newBlock)
-
-                        print("\nvis_blocks b4:\t",mintingAgent.get_visible_blocks())
+                        confirmBlocks(newBlock)
+                        #print("\nvis_blocks b4:\t",mintingAgent.get_visible_blocks())
                         mintingAgent.add_visible_blocks([newBlock], i)
-                        print("vis_blocks b4:\t",mintingAgent.get_visible_blocks())
+                        #print("vis_blocks b4:\t",mintingAgent.get_visible_blocks())
 
 
                         #advance currentBlock
@@ -410,40 +411,11 @@ class Multi_Agent_Simulation:
                         if currentBlock <=len(self.block_arrival_times):
                             break #done with this
 
-                    #Block(txs, agents, time, len(self.blocks), self.no_of_agents, None) #None for no new blockLinks (yet)
 
-            #Add transaction to directed graph object (with random y coordinate for plotting the graph)
-            #self.DG.add_node(transaction, pos=(transaction.arrival_time, \
-                #np.random.uniform(0, 1)+transaction.agent.id*2), \
-                #node_color=self.agent_colors[transaction.agent.id])
 
             start_selection = time.time() #timing for analysis
 
-           #Select tips
-            #self.tip_selection(transaction)
 
-            #append transacion to visible transactions
-            #transaction.agent.add_visible_transactions([transaction], transaction.arrival_time)
-
-            #ts_time = np.round(time.time() - start_selection, 5)
-            #transaction.set_tip_selection_time(ts_time)
-
-            #start_update_weight = time.time()
-
-
-            #Update weights (of transactions referenced by the current transaction)
-            #if("weighted-" in self.tip_selection_algo):
-            #    self.update_weights_multiple_agents(transaction)
-           # weight_update_time = np.round(time.time() - start_update_weight, 5)
-            #transaction.set_weight_update_time(weight_update_time)
-
-
-
-            #update_progress(transaction.id/self.total_num_tx, transaction) ##transaction increment system
-
-            #Progress bar update
-            #if self.printing:
-            #    update_progress(transaction.id/self.total_num_tx, transaction)
 
             update_progress(i/endTime, i)
             #prevTime=transaction.arrival_time ##old system whereby tx.arrival_time was increment
@@ -485,16 +457,7 @@ class Multi_Agent_Simulation:
             #print_coordinates(self,self.agents)
 
 
-    ##Use to assign a create_block to simulation_multi_agent
-    def consensus_selection(self):
-        if self.consensus == "individual":
-            self.create_block = create_block_individual
-            #create_block_individual(agents,time)
-        elif self.consensus == "near":
-            self.create_block = create_block_near
-            #create_block_near(agents,time)
-        else:
-            sys.exit("ERROR: consensus not supported:\t",str(self.consensus))
+
 
 
 
@@ -634,23 +597,45 @@ class Multi_Agent_Simulation:
                             neighbors.append(agents[i])
 
                             ##trade blocks
-                            #agents[index].add_visible_transactions(agents[i].get_visible_blocks())
-                            #agents[i].add_visible_transactions(agents[index].get_visible_blocks())
+                            #get blocks
+                            indexVisBlocks = agents[index].get_visible_blocks()
+                            iVisBlocks = agents[i].get_visible_blocks()
 
-                            indexBlocks = agents[index].get_visible_blocks()
-                            iBlocks = agents[i].get_visible_blocks()
+                            indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
+                            iConfirmedBlocks =  agents[i].get_confirmed_blocks()
 
-                            print("\nvis Blocks:\t",indexBlocks)
 
-                            agents[index].add_visible_blocks(iBlocks, time)
-                            agents[i].add_visible_blocks(indexBlocks, time)
+                            #Trade blocks
+                            agents[index].add_visible_blocks(iVisBlocks, time)
+                            agents[i].add_visible_blocks(indexVisBlocks, time)
 
-                            ##trade txs
+                            agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                            agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+
+
+
+
+                            ##Trade txs
+                            #get txs
                             indexVisibleTxs = agents[index].get_visible_transactions()
                             iVisibleTxs = agents[i].get_visible_transactions()
 
+                            indexSubmittedTxs = agents[index].get_submitted_transactions()
+                            iSubmittedTxs = agents[i].get_submitted_transactions()
+
+                            indexConfirmedTxs = agents[index].get_confirmed_transactions()
+                            iConfirmedTxs = agents[i].get_confirmed_transactions()
+
+                            #trade txs
                             agents[index].add_visible_transactions(iVisibleTxs, time)
                             agents[i].add_visible_transactions(indexVisibleTxs, time)
+
+                            agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                            agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+
+                            agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                            agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+
 
             ##localBlock necessity
             if self.consensus == "near":
@@ -727,10 +712,11 @@ class Multi_Agent_Simulation:
         selectedTip = None
 
         #print("Valid Tips: ",valid_tips)
-        for tip in enumerate(valid_tips):
+        for tip in valid_tips:
             if (tip.chainNum > longestBlockCount):
                 longestBlockCount = tip.chainNum
                 selectedTip = tip
+
 
 
         self.DG.add_edge(block, selectedTip) #add tip
