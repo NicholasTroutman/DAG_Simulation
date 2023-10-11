@@ -1,3 +1,4 @@
+import traceback
 #Node is a base class that mobile agents and immobile base stations inherit common functions from
 class Node:
     def __init__(self, _counter):
@@ -29,6 +30,9 @@ class Node:
         self.tips = []
         self.record_tips = []
 
+        self.resubmitTxs = []
+
+
 
     ##add functions
 
@@ -36,10 +40,18 @@ class Node:
         #print("\nadd_vis_trans begin: ", time)
         #print("new: ",new_txs)
         #print("old: ",self._visible_transactions)
+        new_txscopy = new_txs.copy()
+        reSubmitTxs = []
+        for tx in new_txscopy:
+            if (tx.resubmit==True and tx not in self._visible_transactions):
+            #if (tx.resubmit==True):
+                #print("RESUBMITTED TX FOUND")
+                reSubmitTxs.append(tx)
+                new_txscopy.remove(tx)
 
-        newest_txs = list(set(new_txs) - set(self._visible_transactions))
-        newest_txs = list(set(new_txs) - set(self._submitted_transactions))        #remove confirmed transactions from newest_txs
-        newest_txs = list(set(new_txs) - set(self._confirmed_transactions))
+        newest_txs = list(set(new_txscopy) - set(self._visible_transactions))
+        newest_txs = list(set(newest_txs) - set(self._submitted_transactions))        #remove confirmed transactions from newest_txs
+        newest_txs = list(set(newest_txs) - set(self._confirmed_transactions))
 
         #print("newest! :",newest_txs)
         for tx in newest_txs:
@@ -47,40 +59,105 @@ class Node:
             if tx.seen[self.id] == "":
                 #print("\nUNSEEN: ", tx,"\n")
                 tx.seen[self.id] = time
-                self._visible_transactions.append(tx)
+                self._visible_transactions.append(tx) #only add if we've never seen before
                 #print("appended to vis_txs: ",self._visible_transactions)
-            if tx in self._visible_transactions and tx in self._confirmed_transactions: #remove confirmed transaction from _visible_transcation list
+            #if  tx in self._confirmed_transactions: #remove confirmed transaction from _visible_transcation list
+                #self._visible_transactions.remove(tx)
+
+        for tx in reSubmitTxs:
+            #print("agent ",self.id," resubmit tx:\t",tx)
+
+            #check if seen
+            if tx.seen[self.id] == "":
+                #print("\nUNSEEN: ", tx,"\n")
+                tx.seen[self.id] = time
+
+            #add to vis_txs
+            self._visible_transactions.append(tx)
+
+            if tx in self._submitted_transactions: #remove confirmed transaction from _visible_transcation list
+                self._submitted_transactions.remove(tx) #ONLY TIME WE GO FROM submitted-->visible
+                #print("\tREMOVING tx from submited_txs:\t",tx)
+            #still remove if in _confirmed_transactions
+            if tx in self._confirmed_transactions: #remove confirmed transaction from _visible_transcation list
                 self._visible_transactions.remove(tx)
+                #print("\tREMOVING tx from vis_txs cuz its confirmed:\t",tx)
+        #if self.id == 0:
+            #print("\n\nend add_vis_txs Agent 0 visible_txs:\t",sorted(self.get_visible_transactions(), key=lambda x: x.id))
 
-    def add_submitted_transactions(self, new_submitted_txs, time):
 
-        newest_submitted_txs = list(set(new_submitted_txs) - set(self._submitted_transactions))
+
+    def add_submitted_transactions(self, new_submitted_txs, currentTime):
+
+        new_submitted_txs2=new_submitted_txs.copy()
+
+        #print(self.id," submitted Txs:",new_submitted_txs2)
+        newest_submitted_txs = list(set(new_submitted_txs2) - set(self._submitted_transactions))
         newest_submitted_txs = list(set(newest_submitted_txs) - set(self._confirmed_transactions))
 
 
         for tx in newest_submitted_txs:
             if tx.seen[self.id] == "": #if unseen
-                tx.seen[self.id] = time
+                tx.seen[self.id] = currentTime
 
             self._submitted_transactions.append(tx)
 
-            if tx in self._visible_transactions and tx in self._submitted_transactions: #remove submitted transaction from _visible_transcation list
+            if tx in self._visible_transactions: #remove submitted transaction from _visible_transcation list
                 self._visible_transactions.remove(tx)
+                #print(self.id," removing from _visible_transcation:\t", tx)
+
+            #add tx self.resubmitTxs
+            if tx.agent == self:
+                #print("add_submitted_transactions -> submitted tx's agent == self, add to resubmitTxs[]")
+                #print("TIME:\t",currentTime)
+                self.resubmitTxs.append([tx, currentTime]) #submit [tx, time], when time+100 happens, resubmit
+
 
 
 
     def add_confirmed_transactions(self, new_confirmed_txs, time):
         newest_confirmed_txs = list(set(new_confirmed_txs) - set(self._confirmed_transactions))
+
         for tx in newest_confirmed_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = time
             self._confirmed_transactions.append(tx)
 
-            if tx in self._visible_transactions and tx in self._confirmed_transactions: #remove confirmed transaction from _visible_transcation list
+            if tx in self._visible_transactions: #remove confirmed transaction from _visible_transcation list
                 self._visible_transactions.remove(tx)
 
-            if tx in self._submitted_transactions and tx in self._confirmed_transactions: #remove confirmed transaction from _visible_transcation list
+            if tx in self._submitted_transactions: #remove confirmed transaction from _visible_transcation list
                 self._submitted_transactions.remove(tx)
+
+
+            ##remove from resubmitTxs list
+            for [temptx, temptime] in self.resubmitTxs: #TODO: CHANGE TO DICTIONARY?
+                if tx == temptx:
+                    #match, remove from resubmitTxs
+                     self.resubmitTxs.remove([temptx,temptime])
+
+
+
+
+    def reSubmitTxs(self, currentTime):
+        #print("Starting reSubmitTxs")
+    ##MAGIC NUMBER
+        #print(self.resubmitTxs)
+        elapsedTime=120 #from simulations this is ~98-99%
+        cutoff=currentTime-elapsedTime
+        reSubmittedTxs = []
+        for tx, txTime in self.resubmitTxs:
+            if txTime<cutoff:
+                #print("\n\n\t",self.id," - RESUBMIT ",tx,":\t",currentTime, " ",txTime,"\n\n")
+                #resubmit
+                reSubmittedTxs.append(tx)
+                self.resubmitTxs.remove([tx,txTime]) #remove
+                if tx in self._submitted_transactions:
+                    self._submitted_transactions.remove(tx)
+                    tx.resubmit = True #resubmit T/F (boolean)
+
+        self.add_visible_transactions(reSubmittedTxs, currentTime)
+
 
     ##Block functions
     def add_visible_blocks(self, new_blocks, time): #no return
@@ -130,7 +207,7 @@ class Node:
 
 #Confirm TXS
 
-##Function to move confirmed blocks' txs to confirmed_txs #TOOD where should this be? in agent?
+##Function to move confirmed blocks' txs to confirmed_txs
     def confirmTxs(self, confirmedBlocks, time):
 
         if len(confirmedBlocks)> 0:

@@ -5,6 +5,7 @@ import ast
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
 
 
 #create agent
@@ -183,7 +184,7 @@ def csv_export(self, file_name):
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
 
-        header=['txID', 'confirmedBlock','chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
+        header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
         for transaction in self.DG.nodes:
@@ -203,6 +204,7 @@ def csv_export(self, file_name):
             line = []
             line.append(block.id) #txid
             line.append(block.confirmed)
+            line.append(block.confirmationTime)
             line.append(block.chainNum)
             line.append(block.confirmedBlocks)
             line.append(list(self.DG.successors(block))) #tips
@@ -213,7 +215,16 @@ def csv_export(self, file_name):
             #line.append(0) ##line.append(transaction.tip_selection_time
             #line.append(0) ## line.append(transaction.weight_update_time)
             line.append(len(list(nx.descendants(self.DG, block)))/(block.id+0.001)) #adoption_rate
+            block.blockTransactions = sorted(block.blockTransactions,key=lambda x: x.id) #sort blockTransactions before printing
             line.append(block.blockTransactions)
+
+            txtimes = []
+            for tx in block.blockTransactions:
+                txtimes.append(math.ceil(tx.arrival_time))
+
+            #arrival time of all txs
+            line.append(txtimes)
+
             for agentSeen in block.seen:
                 line.append(agentSeen)
                 #print("agentSeen:\t",agentSeen)

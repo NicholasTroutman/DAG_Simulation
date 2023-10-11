@@ -58,7 +58,7 @@ for opt, arg in opts:
         #print("Lambda Found")
         seed=int(arg)
 
-    elif opt in ('-d', '--dhtmode '):
+    elif opt in ('-d', '--dltmode '):
         DLTMode = str(arg).lower()
         if (DLTMode not in  ["linear", "dag", "dht"]   ):
             DLTMode = "linear"

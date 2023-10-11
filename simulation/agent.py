@@ -10,8 +10,8 @@ class Agent(Node):
         self.vector=[]
         self.speed=15
 
-        
-        
+
+
         
 ##Don't know if these need to be specified
     #def __str__(self):
