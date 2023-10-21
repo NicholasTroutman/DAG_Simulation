@@ -1,0 +1,6 @@
+ID,confirmedBlock,confirmationTime,chainNum,orderTime,confirmed_blocks,tips,arrival_time,agent,adoption_rate,block_transactions,transaction_creation_time,agent_1,agent_2,agent_3,agent_4,agent_5
+0,False,,0,,[],[],0,[0],0.0,[],[],0,37,,,
+1,False,,0,,[],[],0,[1],0.0,[],[],37,0,,27,22
+2,False,,0,,[],[],0,[2],0.0,[],[],,,0,,
+3,False,,0,,[],[],0,[3],0.0,[],[],37,27,,0,
+4,False,,0,,[],[],0,[4],0.0,[],[],37,22,,27,0

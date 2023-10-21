@@ -108,7 +108,7 @@ class HashGraphBlock:
             self.blockLinks = []
 
         else:
-            if len(__blockLinks) != 2:
+            if len(__blockLinks) <1 or len(__blockLinks) >2:
                 sys.exit("ERROR: creating hashGraphBlock with too many blockLinks:\t"+str(len(__blockLinks)) )
             else: #proper number of __blockLinks
                 self.blockLinks = __blockLinks
@@ -133,7 +133,12 @@ def stronglySee( source, destination, DG, numAgents):
     #print("\nStronglySee: ",source," - ",destination)
     superMajority = math.ceil(2/3*numAgents) #get superMajority
     agentsSeen = set() #make it a set,
-    agentsSeen.add(source.creators[0]) #add source
+    #agentsSeen.add(source.creators[0]) #add source
+
+    #for shared ownership blocks
+    for c in source.creators:
+        agentsSeen.add(c)
+
     #print("\n\t\tSTRONGLY SEE: ",source," created by ",source.creators)
 
     for b in source.blockLinks:
@@ -158,7 +163,9 @@ def _dfs(source, destination, DG, agentsSeen, superMajority): #returns Found(t/f
     found=False
     subFound = False
     #print("\t\t\t_dfs: ",source,"/",source.creators[0]," - ",destination)
-    agentsSeen.add(source.creators[0]) #add intermediary
+    #agentsSeen.add(source.creators[0]) #add intermediary
+    for c in source.creators:
+        agentsSeen.add(c)
 
     ##recursively check blocks and append new agentsSeen to agentsSeen
     for block in source.blockLinks: #for each blockLink
@@ -166,7 +173,11 @@ def _dfs(source, destination, DG, agentsSeen, superMajority): #returns Found(t/f
         #print("\t\t\t\t intermediary: ",block,"\t",agentsSeen)
         if block.id == destination.id: #if match, return
             found=True #found destination/target block
-            agentsSeen.add(block.creators[0]) #add agent
+            #agentsSeen.add(block.creators[0]) #add agent
+            ##for multiple owners
+            for c in block.creators:
+                agentsSeen.add(c)
+
             #print("\t\t\t\tDESTINATION FOUND!!!\t",agentsSeen)
             if len(agentsSeen)>=superMajority: #if supermajority, return and be done
                 return True, agentsSeen #SUCCESS
@@ -225,7 +236,7 @@ def shortestDestinationPredecessorTime(source, destination, DG):
     branch =source.blockLinks
 
     if destination in branch:
-        print("\tDESTINATION: ",destination, " -- ", source.creation_time, " from ",source)
+        #print("\tDESTINATION: ",destination, " -- ", source.creation_time, " from ",source)
         return source.creation_time #done
 
     visitedBlocks = branch
@@ -239,7 +250,7 @@ def shortestDestinationPredecessorTime(source, destination, DG):
             for tipLink in tipLinks: #for each next gen tip/block
 
                 if tipLink == destination: #IF match to dstination
-                    print("\tDESTINATION: ",destination, " -- ", tip.creation_time, " from ",tip)
+                    #print("\tDESTINATION: ",destination, " -- ", tip.creation_time, " from ",tip)
                     return tip.creation_time #return destination's ancestor's creation time
 
                 elif tipLink.id > destination.id: #still room, traverse
@@ -252,6 +263,9 @@ def shortestDestinationPredecessorTime(source, destination, DG):
 
     return -1
 
+def intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3
 
 ##assign r value to source block, must strongly see superMajority of witnesses
 #witnesses  = {}, key = round#, value is list of witnesses
@@ -259,15 +273,21 @@ def divideRounds(source, witnesses, DG,  numAgents, largestR):
     #print("\n\nSTART DIVIDE ROUNDS")
     superMajority = math.ceil(2/3*numAgents) #get superMajority #
 
-    lastRound = -1
+    #lastRoundsMax is dictionary {Agent.ID : maximumValue of agent's linkedBlocks' chainNum}
+    #EXAMPLE: newBlock -->[block 1, block2], chainNum's 1 and 2 respectively, both are created by agent 0, then lastRoundsMax[0]=2
+    lastRoundsMax = {source.creators[0]: 0, source.creators[1]: 0}
     minRound = 0
-    for b in source.blockLinks:
+    for b in source.blockLinks: #for each linked Block 2
         minRound = max(b.chainNum, minRound)
-        if b.creators == source.creators:
-            lastRound = b.chainNum
+        for bc in b.creators: #for each creator in linked block 2*2
+            if bc in source.creators: #if creator in source's creators
+                lastRoundsMax[bc] = max(lastRoundsMax[bc], b.chainNum) #add to dictionary of lastRoundsMax if larger than existing
+
+    #now lastRounds is list of all own created blockLinks'
 
     #print("\n\ndivideRounds Start")
     #print("minround: ",minRound)
+    ##Check if newBlock's chainNum is higher than linked blocks' chainNum
     for r in reversed(range(minRound,largestR+1)): #for R->0
         #print("\n\tr: ",r," witness: ",witnesses[r])
         if len(witnesses[r])>=superMajority:
@@ -285,7 +305,8 @@ def divideRounds(source, witnesses, DG,  numAgents, largestR):
                         #print("\tFound ChainNum: ",source.chainNum)
                         #check if witness' last block was same R
                         for b in source.blockLinks: #for every linked block
-                            if b.creators == source.creators: #if same creator
+                            #if b.creators == source.creators: #if same creator
+                            if intersection(b.creators, source.creators):
                                 if b.chainNum < source.chainNum: #if smaller chainNum, then witness!
                                     source.witness = True #source block  witness
                                     #print("\tIS WITNESS: ",source.witness)
@@ -318,44 +339,52 @@ def divideRounds(source, witnesses, DG,  numAgents, largestR):
 
     #have not found chainnum, same as previous blockLink's chainNum
     source.chainNum = minRound
-    if minRound != lastRound: #witness!!
-        source.witness=True
-        #assign sees/stronglySees
-        for b in source.blockLinks:
-            if b.chainNum==source.chainNum: #also a witness
-                source.witnessesSeen += b.witnessesSeen
-                source.witnessesStronglySeen += b.witnessesStronglySeen
+    for lrm in lastRoundsMax: #for each lastRoundsMax (belonging to different agents)
+        #print("\tlrm: ",lastRoundsMax[lrm])
+        if minRound != lastRoundsMax[lrm]: #If minRound of blockLinks != lastRoundmax of any creator, then the newBlock is a witness!!
+            source.witness=True
+            #assign sees/stronglySees
+            for b in source.blockLinks:
+                if b.chainNum==source.chainNum: #also a witness
+                    source.witnessesSeen += b.witnessesSeen
+                    source.witnessesStronglySeen += b.witnessesStronglySeen
 
-        #get unique witnesses only
-        source.witnessesSeen=list(set(source.witnessesSeen))
-        source.witnessesStronglySeen = list(set(source.witnessesStronglySeen))
+            #get unique witnesses only
+            source.witnessesSeen=list(set(source.witnessesSeen))
+            source.witnessesStronglySeen = list(set(source.witnessesStronglySeen))
 
-        #fill in rest from witnesses
-        for w in set(witnesses[source.chainNum-1]):
-            stronglySeen = False
-            for wss in source.witnessesStronglySeen:
-                if w.id ==wss.id: #
-                    stronglySeen = True
-            if stronglySeen==False:
-                #print("ADDING: ",wr)
-                if stronglySee(source, w, DG, numAgents):
-                    source.witnessesStronglySeen.append(w)
-                    if w not in source.witnessesSeen:
-                        source.witnessesSeen.append(w)
-                else:
-                    if w not in source.witnessesSeen:
-                        if see(source, w, DG):
+            #fill in rest from witnesses
+            #print("\n\n")
+            #print(source.chainNum-1)
+            #print(witnesses)
+            #print(lastRoundsMax)
+            for w in set(witnesses[source.chainNum-1]):
+                stronglySeen = False
+                for wss in source.witnessesStronglySeen:
+                    if w.id ==wss.id: #
+                        stronglySeen = True
+                if stronglySeen==False:
+                    #print("ADDING: ",wr)
+                    if stronglySee(source, w, DG, numAgents):
+                        source.witnessesStronglySeen.append(w)
+                        if w not in source.witnessesSeen:
                             source.witnessesSeen.append(w)
-        #get unique witnesses only
-        source.witnessesSeen=list(set(source.witnessesSeen))
-        source.witnessesStronglySeen = list(set(source.witnessesStronglySeen))
+                    else:
+                        if w not in source.witnessesSeen:
+                            if see(source, w, DG):
+                                source.witnessesSeen.append(w)
+            #get unique witnesses only
+            source.witnessesSeen=list(set(source.witnessesSeen))
+            source.witnessesStronglySeen = list(set(source.witnessesStronglySeen))
 
-        for ws in source.witnessesSeen:
-            if ws.chainNum == source.chainNum:
-                source.witnessesSeen.remove(ws)
-        for wss in source.witnessesStronglySeen:
-            if wss.chainNum == source.chainNum:
-                source.witnessesStronglySeen.remove(wss)
+            for ws in source.witnessesSeen:
+                if ws.chainNum == source.chainNum:
+                    source.witnessesSeen.remove(ws)
+            for wss in source.witnessesStronglySeen:
+                if wss.chainNum == source.chainNum:
+                    source.witnessesStronglySeen.remove(wss)
+
+            break #only need to call newBlock witness once
 
         #print("\n\tINHERITED WITNESS: ",source.witnessesStronglySeen, " - ",source.witnessesSeen)
 
