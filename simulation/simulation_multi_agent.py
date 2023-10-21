@@ -8,7 +8,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 from numpy.random import rand
-from operator import add
+from operator import add, attrgetter
 
 from simulation.helpers import update_progress, create_distance_matrix, \
 common_elements, clamp, load_file, create_coordinates, create_coordinates_nodes
@@ -16,7 +16,7 @@ from simulation.mapMaker import Distance, DistanceToVector,  FindEdges, Identfiy
 from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents
 from simulation.agent import Agent
 from simulation.transaction import Transaction
-from simulation.block import DAGBlock, LinearBlock, confirmBlocks
+from simulation.block import DAGBlock, LinearBlock, HashGraphBlock,  confirmBlocks, stronglySee, divideRounds, isFamous, orderRange
 
 
 from simulation.DLTFuncs import create_block_near, create_block_individual
@@ -31,7 +31,11 @@ class Multi_Agent_Simulation:
         self.consensus = _consensus #individual (PoW), near (PoS)
         #self.consensus_selection() ##assign self.create_block to either individual or near
 
-        self.DLTMode = _DLTMode #dag, linear, dht
+        self.DLTMode = _DLTMode #dag, linear, dht, or hashgraph
+
+        if self.DLTMode == "hashgraph":
+            self.witnesses = {}
+            self.stragglers = []
         self.seed = _seed
         self.no_of_transactions = _no_of_transactions
         self.lam = _lambda
@@ -124,8 +128,8 @@ class Multi_Agent_Simulation:
         self.arrival_times = list(np.cumsum(inter_arrival_times))
 
 
-        #Createa random arrival times for self blocks
-        if self.consensus == "individual": #PoW
+        #Createa random arrival times for self blocks in predetermined modes (indivdual + Blockchain)
+        if self.consensus == "individual" and (self.DLTMode == "linear" or self.DLTMode == "dag"): #PoW
 
             inter_arrival_times = np.random.exponential(40 / self.lam, int(self.no_of_transactions/40) ) #5x tx rate HARDCODED NT TODO: MAKE DYNAMIC NICK
 
@@ -143,36 +147,62 @@ class Multi_Agent_Simulation:
                 self.arrival_times.append((1/self.lam_m)*(i+1))
 
         self.arrival_times.sort()
-
-        #Create genesis transaction object, store in list and add to graph object
         transaction_counter = 0
-        self.transactions.append(Transaction(0, transaction_counter, self.no_of_agents))
-        #self.createBlock(txs, [mintingAgent], self.block_arrival_times[currentBlock], len(self.blocks), self.no_of_agents, None)
-        self.blocks.append(self.createBlock([], [self.agents[0]], 0, 0, self.no_of_agents, None)) #genesis block
-        for s in self.blocks[0].seen:
-            s=0 #set seen for everyone at 0
 
-        for agent in self.agents: #add to vis blocks for everyone
-            agent.add_visible_blocks([self.blocks[0]], 0)
+        if self.DLTMode == "dag" or self.DLTMode == "linear":
+            #Create genesis transaction object, store in list and add to graph object
+            self.transactions.append(Transaction(0, transaction_counter, self.no_of_agents))
+            transaction_counter += 1
+            self.blocks.append(self.createBlock([], [self.agents[0]], 0, 0, self.no_of_agents, None)) #genesis block
+
+            #set seen for everyone
+            for s in self.blocks[0].seen:
+                s=0 #set seen for everyone at 0
+
+            for agent in self.agents: #add to vis blocks for everyone
+                agent.add_visible_blocks([self.blocks[0]], 0)
 
 
-        self.DG.add_node(self.blocks[0], pos=(self.blocks[0].creation_time, \
-                np.random.uniform(0, 1)+self.blocks[0].creators[0].id*2), \
-                node_color=self.agent_colors[self.blocks[0].creators[0].id])
 
-        #print("genesis: ",self.transactions[0].seen)
+            self.DG.add_node(self.blocks[0], pos=(self.blocks[0].creation_time, \
+                    np.random.uniform(0, 1)+self.blocks[0].creators[0].id*2), \
+                    node_color=self.agent_colors[self.blocks[0].creators[0].id])
 
-        #for count, seenTime in enumerate(self.transactions[0].seen):
-        #    self.transactions[0].seen[count]=0
 
-        #self.DG.add_node(self.transactions[0], pos=(0, 0), no=transaction_counter, node_color='#99ffff')
 
-        transaction_counter += 1
+        #create a "joining block" for each agent
+        elif self.DLTMode == "hashgraph":
+            self.witnesses[0] = [] #initialize witnesses[0] as empty list
+            for agent in self.agents:
+                self.blocks.append(self.createBlock([], [agent], 0, len(self.blocks), self.no_of_agents, None)) #genesis block(s)
+                #set seen for minting agent_tip_colors
+                #self.blocks[-1].seen[agent.id] = 0
+                #add to vis list for minting agent
+                #print("\nWitness block: ",self.blocks[-1])
+                agent.add_visible_blocks([self.blocks[-1]], 0)
 
-        #Create other transaction objects and store in list
+                #add to networkx DG
+                self.DG.add_node(self.blocks[-1], pos=(self.blocks[-1].creation_time, \
+                        np.random.uniform(0, 1)+self.blocks[-1].creators[0].id*2), \
+                        node_color=self.agent_colors[self.blocks[-1].creators[0].id])
+
+                #add to witnesses list
+                self.witnesses[0].append(self.blocks[-1])
+                self.blocks[-1].witness = True
+
+            #print("\n0 Witnesses = ",self.witnesses[0])
+            #sys.exit("DEBUG")
+
+            ##create tradeTime for each agent
+            for agent in self.agents:
+                agent.tradeTime = [-5]*self.no_of_agents
+                #print("\nagent vis_blocks:\t",agent.get_visible_blocks())
+        #Create other transaction objects and store in list, transact
+        transaction_counter = 0
         for i in range(len(self.arrival_times)):
             self.transactions.append(Transaction(self.arrival_times[i], transaction_counter, self.no_of_agents)) #create transactions + seen list
             transaction_counter += 1
+
 
 
 
@@ -290,12 +320,12 @@ class Multi_Agent_Simulation:
 ##Block(txs, agents, time, len(self.blocks), self.no_of_agents, None) #None for no new blockLinks (yet)
     #wrapper to select which block we are creating
     def createBlock(self, txs, agents, creation_time, blockCounter, numAgents, blockLinks):
-        for tx in txs:
-            tx.resubmit = False
         if self.DLTMode == "linear":
             return LinearBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks)
         elif self.DLTMode == "dag":
             return DAGBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks)
+        elif self.DLTMode == "hashgraph":
+            return HashGraphBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks)
         elif self.DLTMode == "dht":
             sys.exit("ERROR: DHT not supported yet")
 
@@ -372,21 +402,11 @@ class Multi_Agent_Simulation:
                 currentTx +=1 #check next Tx
 
 
-            ##print Agent 1 txs
-            #sorted(newBlock.blockTransactions, key=lambda x: x.id)
-            #print("\n\n\nBegin of loop Agent 0 visible_txs:\t",sorted(self.agents[0].get_visible_transactions(), key=lambda x: x.id))
-            #print("Agent 0 submitted_txs:\t",sorted(self.agents[0].get_submitted_transactions(), key=lambda x: x.id))
-            #print("Agent 0 confirmed_txs:\t",sorted(self.agents[0].get_confirmed_transactions(), key=lambda x: x.id))
-            #print("\n\n\n")
-
 
 
             ##Move agents
             self.moveAgents(i, prevTime)
 
-            #resubmit failed TXS
-            for agent in self.agents:
-                agent.reSubmitTxs(i)
 
 
             #mint Txs & Do something every 400 to clean visible_transactions
@@ -395,72 +415,64 @@ class Multi_Agent_Simulation:
                 transaction.agent.add_visible_transactions([transaction],  transaction.arrival_time) #add tips to minted tx
                 self.cleanOldTxsAndBlocks(transaction) ##Do something every 400 to clean visible_transactions
 
-            ##exchange transactions
-            #self.transfer_txs_and_blocks(self.agents,  transaction.arrival_time)
-            self.transfer_txs_and_blocks(self.agents,  i)
+            if self.DLTMode == "linear" or self.DLTMode == "dag":
+                ##exchange transactions
+                self.transfer_txs_and_blocks(self.agents,  i)
+                ##PoW minting
+                if self.consensus == "individual": #individual
+                    #print("Current Block:\t",currentBlock)
+                    #print("block_arrival_times:\t",self.block_arrival_times)
+                    if currentBlock < len(self.block_arrival_times):
+                        while self.block_arrival_times[currentBlock] < i:
+                            mintingAgent = self.agents[self.block_owners[currentBlock]]
 
-            #print("\npost-transfer txs and blocks")
-            #print("\n\n\nAgent 0 visible_txs:\t",sorted(self.agents[0].get_visible_transactions(), key=lambda x: x.id))
-            #print("Agent 0 submitted_txs:\t",sorted(self.agents[0].get_submitted_transactions(), key=lambda x: x.id))
-            #print("Agent 0 confirmed_txs:\t",sorted(self.agents[0].get_confirmed_transactions(), key=lambda x: x.id))
-            #print("\n\n")
+                            #print("\n\nminting Agent vis_txs b4 minting:\t",sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id))
+                            #print("minting Agent sub_txs b4 minting:\t",    sorted(mintingAgent.get_submitted_transactions(), key=lambda x: x.id))
 
+                            txs = list(set(mintingAgent.get_visible_transactions()))
+                            #print("\tminting txs:",sorted(txs, key=lambda x: x.id))
+                            #def createBlock(self, txs, agents, creation_time, blockCounter, numAgents, blockLinks):
+                            newBlock = self.createBlock(txs, [mintingAgent], self.block_arrival_times[currentBlock], len(self.blocks), self.no_of_agents, None)
+                            self.blocks.append(newBlock)
 
-            ##PoW minting
-
-            if self.consensus == "individual":
-                #print("Current Block:\t",currentBlock)
-                #print("block_arrival_times:\t",self.block_arrival_times)
-                if currentBlock < len(self.block_arrival_times):
-                    while self.block_arrival_times[currentBlock] < i:
-                        mintingAgent = self.agents[self.block_owners[currentBlock]]
-
-                        #print("\n\nminting Agent vis_txs b4 minting:\t",sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id))
-                        #print("minting Agent sub_txs b4 minting:\t",    sorted(mintingAgent.get_submitted_transactions(), key=lambda x: x.id))
-
-                        txs = list(set(mintingAgent.get_visible_transactions()))
-                        #print("\tminting txs:",sorted(txs, key=lambda x: x.id))
-                        #def createBlock(self, txs, agents, creation_time, blockCounter, numAgents, blockLinks):
-                        newBlock = self.createBlock(txs, [mintingAgent], self.block_arrival_times[currentBlock], len(self.blocks), self.no_of_agents, None)
-                        self.blocks.append(newBlock)
-
-                        #print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\nblock ID",newBlock,"-",newBlock.creators,", ",newBlock.blockLinks,":\t",sorted(newBlock.blockTransactions, key=lambda x: x.id))
+                            #print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\nblock ID",newBlock,"-",newBlock.creators,", ",newBlock.blockLinks,":\t",sorted(newBlock.blockTransactions, key=lambda x: x.id))
 
 
-                        #use up txs
-                        mintingAgent.add_submitted_transactions(txs, i)
-                        #print("minting Agent vis_txs after minting:\t",sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id))
-                        #print("minting Agent sub_txs after minting:\t",sorted(mintingAgent.get_submitted_transactions(), key=lambda x: x.id),"\n\n")
-
-                        #for tx in sorted(mintingAgent.get_submitted_transactions(), key=lambda x: x.id):
-                            #if tx.resubmit == True:
-                                #print("\nRESUBMITTED TX ",tx," IS IN submitted_transactions?\n")
-
-                        #add block to DG
-                        self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
-                                np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
-                                node_color=self.agent_colors[newBlock.creators[0].id])
+                            #use up txs
+                            mintingAgent.add_submitted_transactions(txs, i)
+                            #print("minting Agent vis_txs after minting:\t",sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id))
+                            #print("minting Agent sub_txs after minting:\t",sorted(mintingAgent.get_submitted_transactions(), key=lambda x: x.id),"\n\n")
 
 
-                        #choose tsa
-                        maxLink = 1
-                        if self.DLTMode == "dag":
-                            maxLink = self.blocks[0].maxLinks
-                            #print("\n",self.DLTMode, " maxLink: ",maxLink)
-                        for i in range(0,maxLink):
-                            self.tip_selection(newBlock) #add maxLink blocks
 
-                        #print("newBlock links: ",newBlock.blockLinks)
-                        confirmBlocks(newBlock)
-
-                        mintingAgent.add_visible_blocks([newBlock], i)
+                            #add block to DG
+                            self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
+                                    np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
+                                    node_color=self.agent_colors[newBlock.creators[0].id])
 
 
-                        #advance currentBlock
-                        currentBlock+=1
-                        if currentBlock <=len(self.block_arrival_times):
-                            break #done with this
+                            #choose tsa
+                            maxLink = 1
+                            if self.DLTMode == "dag":
+                                maxLink = self.blocks[0].maxLinks
+                                #print("\n",self.DLTMode, " maxLink: ",maxLink)
+                            for j in range(0,maxLink):
+                                self.tip_selection(newBlock) #add maxLink blocks
 
+                            #print("newBlock links: ",newBlock.blockLinks)
+                            confirmBlocks(newBlock)
+
+                            mintingAgent.add_visible_blocks([newBlock], i)
+
+
+                            #advance currentBlock
+                            currentBlock+=1
+                            if currentBlock <=len(self.block_arrival_times):
+                                break #done with this
+            elif self.DLTMode == "hashgraph": ##createBlock and transfer as hashgraph
+                #trade blocks, if new blocks arrive, create block/event
+                self.transfer_txs_and_blocks(self.agents,  i)
+                #sys.exit("\ntrade then mint event/block")
 
 
             start_selection = time.time() #timing for analysis
@@ -491,6 +503,11 @@ class Multi_Agent_Simulation:
         # self.calc_attachment_probabilities(transaction)
         # self.calc_confirmation_confidence_multiple_agents(transaction)
 
+
+        #paths = list( nx.all_simple_paths(self.DG, source = self.blocks[42], target = self.blocks[35], cutoff = 42-35+1) )
+        #print("\n\nPaths from 42-->35: ",paths)
+        #flattened = list(set([node for sublist in paths for node in sublist]))
+        #print("\nflattened = ",flattened)
 
         print("Show DAG")
         print_graph(self)
@@ -626,80 +643,221 @@ class Multi_Agent_Simulation:
 
     ##TODO: transfer transactions and blocks within radius
     def transfer_txs_and_blocks(self,agents, time): #radius=distance for tx transfer,
-    #def transfer_transactions(self,agents, time): #radius=distance for tx transfer,
+        #print("\ntransfering")
         radius=agents[0].radius #save radius in agent variables
         #if agents within radius, transfer txs
-        numAgents=len(agents)-1
+        lastAgent=len(agents)-1
         neighbors=[]
         #loop through all agents and append txs
-        for index, agent in enumerate(agents): #Number of comparison (n^2-n)/2
 
-            if (index!=numAgents): #end condition
-                neighbors=[agents[index]]
-                neighborsCount=0 #number of neighbors, if meets threshold, then create block
+        if self.DLTMode != "hashgraph":
+            for index, agent in enumerate(agents): #Number of comparison (n^2-n)/2
 
-                for i in range(index,len(agents)): #check distance between all agents
+                if (index!=lastAgent): #end condition
+                    neighbors=[agents[index]]
+                    neighborsCount=0 #number of neighbors, if meets threshold, then create block
 
-                    if (i != index):
-                        distance=math.hypot(agents[index].coordinates[0] - agents[i].coordinates[0], agents[index].coordinates[1] - agents[i].coordinates[1])
+                    for i in range(index,len(agents)): #check distance between all agents
 
-                        if distance<radius:  # if true then neighbors
-                            neighborsCount += 1
-                            neighbors.append(agents[i])
+                        if (i != index):
+                            distance=math.hypot(agents[index].coordinates[0] - agents[i].coordinates[0], agents[index].coordinates[1] - agents[i].coordinates[1])
 
-                            ##trade blocks
-                            #get blocks
-                            indexVisBlocks = agents[index].get_visible_blocks()
-                            iVisBlocks = agents[i].get_visible_blocks()
+                            if distance<radius:  # if true then neighbors
+                                neighborsCount += 1
+                                neighbors.append(agents[i])
 
-                            indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
-                            iConfirmedBlocks =  agents[i].get_confirmed_blocks()
+                                ##trade blocks
+                                #get blocks
+                                indexVisBlocks = agents[index].get_visible_blocks()
+                                iVisBlocks = agents[i].get_visible_blocks()
 
-
-                            #Trade blocks
-                            agents[index].add_visible_blocks(iVisBlocks, time)
-                            agents[i].add_visible_blocks(indexVisBlocks, time)
-
-                            agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
-                            agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+                                indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
+                                iConfirmedBlocks =  agents[i].get_confirmed_blocks()
 
 
-                            ##Trade txs
-                            #get txs
-                            indexVisibleTxs = agents[index].get_visible_transactions()
-                            iVisibleTxs = agents[i].get_visible_transactions()
+                                #Trade blocks
+                                agents[index].add_visible_blocks(iVisBlocks, time)
+                                agents[i].add_visible_blocks(indexVisBlocks, time)
 
-                            indexSubmittedTxs = agents[index].get_submitted_transactions()
-                            iSubmittedTxs = agents[i].get_submitted_transactions()
-
-                            indexConfirmedTxs = agents[index].get_confirmed_transactions()
-                            iConfirmedTxs = agents[i].get_confirmed_transactions()
-
-                            #trade txs
-                            agents[index].add_visible_transactions(iVisibleTxs, time)
-
-                            agents[i].add_visible_transactions(indexVisibleTxs, time)
-                            #CHECK FOR agent 0 visible_tx
-                            minIndex= min(i,index)
+                                agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
 
 
-                            agents[index].add_submitted_transactions(iSubmittedTxs, time)
-                            agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+                                ##Trade txs
+                                #get txs
+                                indexVisibleTxs = agents[index].get_visible_transactions()
+                                iVisibleTxs = agents[i].get_visible_transactions()
 
-                            agents[index].add_confirmed_transactions(iConfirmedTxs, time)
-                            agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+                                indexSubmittedTxs = agents[index].get_submitted_transactions()
+                                iSubmittedTxs = agents[i].get_submitted_transactions()
+
+                                indexConfirmedTxs = agents[index].get_confirmed_transactions()
+                                iConfirmedTxs = agents[i].get_confirmed_transactions()
+
+                                #trade txs
+                                agents[index].add_visible_transactions(iVisibleTxs, time)
+
+                                agents[i].add_visible_transactions(indexVisibleTxs, time)
+                                #CHECK FOR agent 0 visible_tx
+                                minIndex= min(i,index)
 
 
-            ##localBlock necessity
-            if self.consensus == "near":
-                if neighborsCount > 2: #need 3 total nearby
-                    self.create_block(neighbors,  time) #create block with nearby nodes
+                                agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+
+                                agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
 
 
+                ##localBlock necessity
+                if self.consensus == "near":
+                    if neighborsCount > 2: #need 3 total nearby
+                        self.create_block(neighbors,  time) #create block with nearby nodes
+
+        elif self.DLTMode == "hashgraph":
+            ##trade txs like regular, if difference made, if new vis_block created
+            for index, agent in enumerate(agents): #Number of comparison (n^2-n)/2
+
+                if (index!=lastAgent): #end condition
+                    neighbors=[agents[index]]
+                    neighborsCount=0 #number of neighbors, if meets threshold, then create block
+
+                    for i in range(index,len(agents)): #check distance between all agents
+
+                        if (i != index):
+                            distance=math.hypot(agents[index].coordinates[0] - agents[i].coordinates[0], agents[index].coordinates[1] - agents[i].coordinates[1])
+
+                            #print("\nTrade Time t/f: ", (agents[index].tradeTime[i]< time-4))
+                            if distance<radius and (agents[index].tradeTime[i]< time-15):  # if true then neighbors #TIME IS FIXED TODO
+                                #print("\nclose and time T")
+                                neighborsCount += 1
+                                neighbors.append(agents[i])
+
+                                ##trade blocks
+                                #get blocks
+                                indexVisBlocks = agents[index].get_visible_blocks()
+                                iVisBlocks = agents[i].get_visible_blocks()
+
+                                #print("viSblocks BEFORE:\t",indexVisBlocks," - ",iVisBlocks)
+
+                                ##NEVER PASS CONFIRMED BLOCKS
+                                indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
+                                iConfirmedBlocks =  agents[i].get_confirmed_blocks()
 
 
+                                #Trade blocks
+                                indexChanged = agents[index].add_visible_blocks(iVisBlocks, time)
+                                iChanged = agents[i].add_visible_blocks(indexVisBlocks, time)
+
+                                #print("\nchanged:\t",indexChanged," - ",iChanged)
+                                #print("viSblocks AFTER:\t",agents[index].get_visible_blocks()," - ",agents[i].get_visible_blocks())
+
+                                #not passing confirmed blocks
+                                agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
 
 
+                                ##Trade txs
+                                ## HASHGRAPH DOESNT TRADE VIS_TXS
+                                #indexVisibleTxs = agents[index].get_visible_transactions()
+                                #iVisibleTxs = agents[i].get_visible_transactions()
+
+                                indexSubmittedTxs = agents[index].get_submitted_transactions()
+                                iSubmittedTxs = agents[i].get_submitted_transactions()
+
+                                indexConfirmedTxs = agents[index].get_confirmed_transactions()
+                                iConfirmedTxs = agents[i].get_confirmed_transactions()
+
+                                #add Txs
+                                ##HASHGRAPH DOESNT ADD VIS TXS
+                                #agents[index].add_visible_transactions(iVisibleTxs, time)
+                                #agents[i].add_visible_transactions(indexVisibleTxs, time)
+
+                                agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+
+                                agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+
+                                mintingAgents = []
+                                if (indexChanged): #mint block
+                                    mintingAgents.append(self.agents[index])
+                                if (iChanged): #mint block
+                                    mintingAgents.append(self.agents[i])
+
+                                if len(mintingAgents)>0:
+                                    agents[index].tradeTime[i] = time
+                                    agents[i].tradeTime[index] = time
+
+                                #print("\nmintingAgent: ",mintingAgents)
+                                for mintingAgent in mintingAgents:
+                                    txs = list(set(mintingAgent.get_visible_transactions()))
+
+                                    ##get blocks to link SHOULD BE ONLY 1 element in submited_blocks
+                                    #print("\n\nAgent ",mintingAgent, " Visible Blocks:\t", mintingAgent.get_visible_blocks())
+                                    visBlocks = mintingAgent.get_visible_blocks()
+                                    if len(visBlocks) != 2:
+                                        exitMessage = "\n\n"+str(mintingAgent) + " Wrong vis_blocks: "+ str(visBlocks)
+                                        sys.exit(exitMessage)
+
+                                    newBlock = self.createBlock(txs, [mintingAgent], time, len(self.blocks), self.no_of_agents, visBlocks)
+                                    self.blocks.append(newBlock)
+
+                                    #print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\nblock ID",newBlock,"-",newBlock.creators,", ",newBlock.blockLinks,":\t",sorted(newBlock.blockTransactions, key=lambda x: x.id))
+
+
+                                    #use up txs
+                                    mintingAgent.add_submitted_transactions(txs, time)
+
+
+                                    #add block to DG
+                                    self.DG.add_node(newBlock, pos=(newBlock.creation_time, \
+                                            np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
+                                            node_color=self.agent_colors[newBlock.creators[0].id])
+
+                                    #print("\nblockLinks: ",newBlock.blockLinks)
+                                    for b in newBlock.blockLinks:
+                                        #print("b - ",b)
+                                        self.DG.add_edge(newBlock, b) #add tip
+                                        #mintingAgent.add_confirmed_blocks(b, time)
+                                    mintingAgent.confirm_all_vis_blocks(time)
+                                    mintingAgent.add_visible_blocks([newBlock], time)
+
+                                    ##check stronglySee
+                                    #print(newBlock, " sees 2 --> ", stronglySee(newBlock, self.blocks[2], self.DG, self.no_of_agents ))
+
+                                    ##check divideRounds
+                                    divideRounds(newBlock, self.witnesses, self.DG, self.no_of_agents, max(self.witnesses.keys()) )
+
+                                    #print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                                    #print(newBlock, " newRound? --> ", newBlock.chainNum, " Witness: ",newBlock.witness)
+                                    #print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                                    if newBlock.witness==True: #witness add to list
+                                        if newBlock.chainNum in self.witnesses.keys():
+                                            #add to existing witness for started round1
+                                            #print("ADDING TO EXISTING WITNESSES")
+                                            self.witnesses[newBlock.chainNum].append(newBlock)
+                                        else:
+                                            #new round and new witness
+                                            #print("Creating new Witness ROund")
+                                            self.witnesses[newBlock.chainNum] = [newBlock]
+
+                                        #check for famous
+                                        if max(self.witnesses.keys())>=3:
+                                            #1. for each strongly seen witnesses[Maxround-1] by newBlock [maxround
+                                                #2. does it See witnesses[maxround-2]
+                                                #3. if supermajority of witnesses[maxround-1] see target, it is famous
+                                            famousWitnesses = []
+                                            for w2 in self.witnesses[newBlock.chainNum-2]: #look two back
+                                                #assign famous blocks
+                                                isFamous(w2, newBlock.witnessesStronglySeen, self.DG, self.no_of_agents, time)
+                                                #collect famous
+                                                if w2.famous==True:
+                                                    famousWitnesses.append(w2)
+
+                                            #order event
+                                            self.stragglers = orderRange(famousWitnesses,  self.stragglers, self.DG, self.witnesses,  self.no_of_agents, time, self.blocks)
+                                            #print("\nBlock: ",newBlock, " round: ", newBlock.chainNum," -- stragglers", self.stragglers)
     #returns valid tips for a given agent
     def get_valid_tips_multiple_agents(self, agent):
 

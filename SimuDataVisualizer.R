@@ -26,14 +26,27 @@ plot(simuData$ID, simuData$adoption_rate, col=simuData$singleAgent, pch=16)
 plot(simuData$ID, simuData$count, col=simuData$singleAgent, pch=16)
 #plot(simuDataOpt$txID, simuDataOpt$count, col=simuData$agent, pch=16) #SAME
 
+##time to share blocks:
+agentSeendf = data.frame(simuData[agentSeen])[-1,]
+shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
+hist(shareTimes, breaks=20)
 
 
-##PROPORTION OF CONFIRMED BLOCKS/Txs
+##PROPORTION OF CONFIRMED BLOCKS/Tot(blocks)
 percentConfirmedBlocks = sum(simuData$confirmedBlock=="True")/nrow(simuData)
+print(percentConfirmedBlocks)
 
-##what is tsa_time? #tip selection time!!
-#plot(simuData$tsa_time, col=simuData$singleAgent, pch=16)
-#plot(simuDataOpt$tsa_time, col=simuData$agent, pch=16)
+##Proportion of confirmed Txs
+unconfirmedBlocks = simuData[simuData$confirmedBlock=="False",]
+numUncomfirmedTxs = 0
+for (i in 2:nrow(unconfirmedBlocks)){
+  tx_creation_time = strsplit(unconfirmedBlocks$transaction_creation_time[i], ",")[[1]] #returns 1, 2 3
+  for (tct in tx_creation_time){
+    numUncomfirmedTxs = numUncomfirmedTxs +1
+    } 
+  }
+print(numUncomfirmedTxs) #num of unconfirmed Txs, divide by #stuff
+
 
 ###PLOTS:
 
@@ -89,25 +102,25 @@ thruPlot+ggtitle("Throughput of Transactions (Linear Blockchain, DC)")+xlab("Tim
 
 
 
- ##LOG PLOT
-txTimes <- data.frame(matrix(ncol=2,nrow=0))
-colnames(txTimes) <- c("time", "confirmed")
-for (i in 1:length(txSubmissionTime2)){
-  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTime2[i], "Unconfirmed")
-}
+# ##LOG PLOT
+#txTimes <- data.frame(matrix(ncol=2,nrow=0))
+#colnames(txTimes) <- c("time", "confirmed")
+#for (i in 1:length(txSubmissionTime2)){
+#  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTime2[i], "Unconfirmed")
+#}
 
-for (i in 1:length(txSubmissionTimeConfirmed2)){
-  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTimeConfirmed2[i], "Confirmed")
-}
+#for (i in 1:length(txSubmissionTimeConfirmed2)){
+#  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTimeConfirmed2[i], "Confirmed")
+#}
 
-thruPlot<-ggplot(melt(txTimes), aes(txTimes$time, fill = L1))+ geom_histogram(position = "stack", binwidth=3)
+#thruPlot<-ggplot(melt(txTimes), aes(txTimes$time, fill = L1))+ geom_histogram(position = "stack", binwidth=3)
 #LOG WOKRED
 
 
 
-dfr <- data.frame(x = rlnorm(length(bucket),sdlog = 5))
-logPlot <- ggplot(dfr,aes(bucket))+ geom_histogram() + scale_x_log10()
-logPlot
+#dfr <- data.frame(x = rlnorm(length(bucket),sdlog = 5))
+#logPlot <- ggplot(dfr,aes(bucket))+ geom_histogram() + scale_x_log10()
+#logPlot
 
 
 #boxplot/violin plot
@@ -120,12 +133,12 @@ ylab("Time")
 
 
 ###Plot Confirmation Time
-import(plyr)
+library(plyr)
 #h <- hist(simuData$timeToConfirm,breaks=50)
 top = round_any( max(simuData$timeToConfirm,na.rm=TRUE),10)
 h <- hist(
   simuData$timeToConfirm,
-  breaks = seq(0, top , 5),
+  breaks = seq(0, top+5 , 5),
   xlim = c(0,top))
 
 par(new = T)
@@ -136,6 +149,10 @@ plot(h)
 lines(x = h$mids, y=ec(h$mids)*max(h$counts), col ='red', lwd=2)
 axis(4, at=seq(from = 0, to = max(h$counts), length.out = 11), labels=seq(0, 1, 0.1), col = 'red', col.axis = 'red')
 mtext(side = 4, line = 3, 'Cumulative Density', col = 'red')
+
+
+
+
 
 
 

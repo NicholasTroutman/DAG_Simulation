@@ -183,8 +183,11 @@ def csv_export(self, file_name):
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
+        if self.DLTMode == "hashgraph":
+            header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'orderTime', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
 
-        header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
+        else:
+            header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
         for transaction in self.DG.nodes:
@@ -206,6 +209,8 @@ def csv_export(self, file_name):
             line.append(block.confirmed)
             line.append(block.confirmationTime)
             line.append(block.chainNum)
+            if self.DLTMode == "hashgraph":
+                line.append(block.orderTime)
             line.append(block.confirmedBlocks)
             line.append(list(self.DG.successors(block))) #tips
             line.append(block.creation_time) #arrival_time

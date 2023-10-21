@@ -60,7 +60,7 @@ for opt, arg in opts:
 
     elif opt in ('-d', '--dltmode '):
         DLTMode = str(arg).lower()
-        if (DLTMode not in  ["linear", "dag", "dht"]   ):
+        if (DLTMode not in  ["linear", "dag", "dht", "hashgraph"]   ):
             DLTMode = "linear"
     elif opt in ('-c', '--consensus '):
         consensus = str(arg).lower()
@@ -115,8 +115,8 @@ dir_name = './SimuData/'
 suffix = '.csv'
 for lam in my_lambda:
     timestr = time.strftime("%Y%m%d-%H%M")
-    base_name = '{}alpha_{}lam_{}_txs_{}_tsa_{}_size_{}' \
-                .format(timestr, alpha, lam, txs, tsa, netsize)
+    base_name = '{}_{}_{}alpha_{}lam_{}_txs_{}_tsa_{}_size_{}' \
+                .format(timestr, DLTMode, consensus, alpha, lam, txs, tsa, netsize)
     simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                                 _no_of_agents = netsize, _alpha = alpha,
                                 _distance = 1, _tip_selection_algo = tsa,

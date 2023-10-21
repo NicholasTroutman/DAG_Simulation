@@ -7,8 +7,6 @@ class Transaction:
             self.agent = None
             self.seen=[""]*_numAgents#list where index=agent and value=time seen, for latency statistics
 
-            self.resubmit = False
-
             #For tip selection and calculating confirmation_confidence
             #self.cum_weight = 1
             #self.cum_weight_multiple_agents  = defaultdict(lambda: 1)
