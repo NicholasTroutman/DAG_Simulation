@@ -1,12 +1,15 @@
 ##Nicholas Troutman
 ##Visualization of CSV SimuData
 
+##\\wsl$\Ubuntu\home\ntroutm\git\DAG_Simulation\SimuData
+
 library(ggplot2)
 library(reshape2)
 
 
 ##upload csv as simuData
 simuData=test
+#simuData=dhtTest
 
 #get number of agents
 agentSeen = grepl("agent_", names(simuData)) #index for 
@@ -29,7 +32,40 @@ plot(simuData$ID, simuData$count, col=simuData$singleAgent, pch=16)
 ##time to share blocks:
 agentSeendf = data.frame(simuData[agentSeen])[-1,]
 shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
-hist(shareTimes, breaks=20)
+shareTimesMedian = apply(agentSeendf, 1, FUN = median)  - apply(agentSeendf, 1, FUN = min)
+
+simuData$maxShareTime = c(0,shareTimes)
+d <- density(simuData$maxShareTime, na.rm=TRUE)
+dmedian <- density(shareTimesMedian, na.rm=TRUE)
+dx <- diff(d$x)[1]
+
+h<-hist(shareTimes, breaks=30)
+
+#overlay kernel density plot
+#lines(x=d$x,y=max(h$counts)*d$y/dx)
+lines(x=d$x,y=d$y*length(shareTimes)*1)
+#new plot
+plot(d)
+
+# Data
+set.seed(5)
+
+df <- data.frame(shareTimes)
+
+# Histogram with kernel density
+ggplot(df, aes(x = shareTimes)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25)
+
+
+##Compare two kernels
+plot(d, "Full Network Penetration Time",xlab="Time", col="blue")
+lines(linearD2,col="red")
+legend(0,0.035, legend=c("DownTown", "HighWay"), col=c("blue","red"), lty=1, cex=1)
+
+
 
 
 ##PROPORTION OF CONFIRMED BLOCKS/Tot(blocks)

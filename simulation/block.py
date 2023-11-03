@@ -35,9 +35,8 @@ class BaseBlock:
 ##block with only 1 possible link (linear)
 class LinearBlock(BaseBlock):
     def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks):
-
         BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents) #list of txs and agents
-
+        #print("\t\tBLOCK: ",__blockCounter, " --? ",__txs, " ~ ",self.blockTransactions)
         if __blockLinks == None:
             self.chainNum = 0
             self.blockLinks = []
@@ -45,7 +44,7 @@ class LinearBlock(BaseBlock):
             if len(__blockLinks) > 1:
                 sys.exit("ERROR: creating LinearBlock with too many blockLinks:\t"+str(len(__blockLinks)) )
             else: #proper number of __blockLinks
-                self.blockLinks = [__blockLinks]
+                self.blockLinks = __blockLinks
                 self.chainNum = self.blockLinks[0].chainNum + 1 #increase chainNum
 
 
@@ -63,7 +62,7 @@ class DAGBlock(BaseBlock):
                 sys.exit("ERROR: creating DAGBlock with too many blockLinks:\t"+str(len(__blockLinks)) )
             else: #proper number of __blockLinks
                 self.blockLinks = [__blockLinks]
-                self.chainNum = max(self.blockLinks, key= attrgetter('chainNum')+1)
+                self.chainNum = max(self.blockLinks, key= attrgetter('chainNum'))+1
 
 
 

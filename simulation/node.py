@@ -1,5 +1,7 @@
 import traceback
 from simulation.block import DAGBlock, LinearBlock
+
+
 #Node is a base class that mobile agents and immobile base stations inherit common functions from
 class Node:
     def __init__(self, _counter):
@@ -15,7 +17,14 @@ class Node:
         self.tradeTime = []
         self.witness = False
         self.coordinates= [] #list of double x and y coordinates in double [x,y]
-        self.radius=60 #hardcoded radius of p2p connectivity
+        self.radius=18.63 #hardcoded radius of p2p connectivity
+        ##Houston Distance: 500ft/88 pixels = 5.681818 ft/pixel
+        ##Wifi Distance = 150-300 ft, call it 250ft --> 250/5.68 = 44.01
+
+        ##Houstonhwy Distance: 2*5280ft/60 pixels = 176 ft/pixel
+        ##Wifi Distance = 150-300 ft, call it 300ft --> 300/176 = 1.7
+        ##LPWAN Distance = 2km, call it 1km ~ 3280ft -->  3280/176 = 18.63
+
 
         #transaction variables
         self._visible_transactions=[]
@@ -47,6 +56,7 @@ class Node:
         newest_txs = list(set(newest_txs) - set(self._submitted_transactions))        #remove confirmed transactions from newest_txs
         newest_txs = list(set(newest_txs) - set(self._confirmed_transactions))
 
+        change = False
         #print("newest! :",newest_txs)
         for tx in newest_txs:
             #print(tx," ",tx.seen[self.id])
@@ -54,7 +64,8 @@ class Node:
                 #print("\nUNSEEN: ", tx,"\n")
                 tx.seen[self.id] = time
                 self._visible_transactions.append(tx) #only add if we've never seen before
-
+                change = True
+        return change
 
 
     def add_submitted_transactions(self, new_submitted_txs, currentTime):
@@ -79,12 +90,23 @@ class Node:
 
 
     def add_confirmed_transactions(self, new_confirmed_txs, time):
+
+        ##Slower after testing
+        #s = set(self._confirmed_transactions)
+        #newest_confirmed_txs = [x for x in new_confirmed_txs if x not in s]
+
+
+
         newest_confirmed_txs = list(set(new_confirmed_txs) - set(self._confirmed_transactions))
+
+
+
 
         for tx in newest_confirmed_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = time
             self._confirmed_transactions.append(tx)
+
 
             if tx in self._visible_transactions: #remove confirmed transaction from _visible_transcation list
                 self._visible_transactions.remove(tx)

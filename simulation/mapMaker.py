@@ -26,7 +26,7 @@ def Distance(n1,n2):
 
 
 #distance of c to a and b line
-def DistanceToVector(a,b,c): 
+def DistanceToVector(a,b,c):
     a=np.array(a)
     b=np.array(b)
     c=np.array(c)
@@ -37,22 +37,22 @@ def DistanceToVector(a,b,c):
 def isPerimeter(image, y, x):
 
     #print("isPerimeter:\t", y,", ",x)
-    
+
     x2=x-2
     y2=y-2
 
-    boxRange=5 #box to make 
+    boxRange=5 #box to make
 
 
     red=False
     grey=False
     blue = False
-    
+
     #quit()
     for i in range(0,boxRange): #x axis
         for j in range(0,boxRange): #y axis
             #print("\ny,x: ",y2+j,", ", x2+i,":\t",image[y2+j][x2+i])
-            
+
             #print(image)
 
             #print(image[y2+j][x2+i][0])
@@ -71,7 +71,7 @@ def isPerimeter(image, y, x):
                 elif image[y2+j][x2+i][2]>100+image[y2+j][x2+i][1]: #blue number found
                     #print("Blue Found")
                     blue = True #not needed
-                else:  
+                else:
                     #print("Grey Found")
                     grey = True #not red or blue
 
@@ -87,7 +87,7 @@ def isPerimeter(image, y, x):
         return True #perimeter
     #quit()
     return False #not perimeter
-    
+
 
 
 #Recursive Function searching for perimeters then find_center
@@ -95,18 +95,18 @@ def findPerimeter(image, y, x, perimeterList):
 
     #print("\n\nfindPerimeter START:\t",y,", ",x, "\t\t",perimeterList   )
     ##find box around
-    boxRange=21 #box to make 
+    boxRange=21 #box to make
     y2=y-10
     x2=x-10
 
-    #erimeterList = [] 
+    #erimeterList = []
     tempPerimeterList = []
 
     ##check start
     #if (isPerimeter(image,y,x)):
     #    perimeterList.append([y,x]) #starting place
-    
-   
+
+
     #X max
     for i in [0,boxRange]: #x axis
         for j in range(0,boxRange): #y axis
@@ -137,9 +137,9 @@ def findPerimeter(image, y, x, perimeterList):
     #print("\nfindPerimeter:\tBegin Distance Calcs:\t",perimeterList )
     tooClose = False;
     for t in tempPerimeterList: #for every new perimeter Pixel
-        tooClose = False; 
+        tooClose = False;
         for p in perimeterList: #for every validated perimeter pixel
-            
+
             #print([t[0], t[1]]," - ",[p[0], p[1] ]," =\t", Distance( [t[0], t[1]], [p[0], p[1] ])) #distance between two pixels
             if Distance( [t[0], t[1]], [p[0], p[1] ]) <10: #if too close,
                 tooClose = True #set flag
@@ -158,59 +158,65 @@ def findPerimeter(image, y, x, perimeterList):
 #    x2=x-20
 #    boxRange = 70 #was 40 for DCRedBlue
 #    reds=[]
-    
+
     #find center of red dot
-#    for i in range(0,boxRange): 
+#    for i in range(0,boxRange):
 #        for j in range(0,boxRange):
 #            try:
 #                if image[y+j][x2+i][0]>100+image[y+j][x2+i][1]: #Red number found
-#                    reds.append([y+j,x2+i])     
+#                    reds.append([y+j,x2+i])
 #            except IndexError:
                 #print("OOB")
 #                pass
-                
-        
+
+
 #    result=np.mean(reds, axis=0)
     #print(result)
-    
+
 #    return [int(result[0]), int(result[1])]z
 
 
 
 #find blue lines around an intersection
 def FindEdges(image, intersections):
-    #print("FINDEDGES FUNC START\n")
+    print("\n\nFindEdges FUNC START\n")
     #start at intersection
     allFinal=[] #[[index,[blues]]]
-    print("\n\nNUMBER OF INTERSECTIONS:\t",intersections)
+    print("\nNUMBER OF INTERSECTIONS:\t",intersections)
     for index, yx in intersections:
         #print(index)
         #print(yx)
-                
-        #trace rectangle around
-        y2=yx[0]-50
-        x2=yx[1]-50
+
+        #trace rectangle around old, 100x100 box
+        #y2=yx[0]-50
+        #x2=yx[1]-50
+        y2=yx[0]-25
+        x2=yx[1]-25
         blues=[]
-        
-        for i in [0,100]:
-            for j in range(0,100):
+
+        #for i in [0,100]: #old, 100x100 box
+        #    for j in range(0,100): #old, 100x100 box
+        for i in [0,50]: #old, 100x100 box
+            for j in range(0,50): #old, 100x100 box
                 try:
                     #print("y: ",y2+j," x: ",x2+i)
                     if image[y2+j][x2+i][2]>100+image[y2+j][x2+i][1]: #blue number found
-                        blues.append([y2+j,x2+i])     
+                        blues.append([y2+j,x2+i])
                 except IndexError:
                     #print("OOB")
                     pass
-            
-        for i in range(0,100):
-            for j in [0,100]:
+
+        #for i in range(0,100):
+        #    for j in [0,100]:
+        for i in range(0,20):
+            for j in [0,50]:
                 try:
                     if image[y2+j][x2+i][2]>100+image[y2+j][x2+i][1]: #Blue number found)
-                        blues.append([y2+j,x2+i])     
+                        blues.append([y2+j,x2+i])
                 except IndexError:
                     #print("OOB")
-                    pass        
-                
+                    pass
+
         #get rid of similar blues
         #print(blues)
         final=[]
@@ -220,27 +226,27 @@ def FindEdges(image, intersections):
             for b in blues:
                 if Distance(blues[0],b)<5: #too similar
                     same.append(b)
-            
+
             final.append(np.mean(same, axis=0))
             blues=[b for b in blues if b not in same]
             #print(blues)
-        
+
         #print(final)
-        
+
         finalPretty= [[int(x),int(y)] for x,y in final]
         allFinal.append([index,finalPretty])
-        
+
         #for i in allFinal:
             #print("Intersection: ",i,"\n")
-        
-        print("\n\n")
-        
+
+        #print("\n\n")
+
         #pass all blues to IdentifyBlueEdgeIntersections
         neighbors=[] #[[index, [neighbpors]]]
         for index, blues in allFinal:
             n=IdentfiyBlueEdgeIntersection(intersections, intersections[index],blues)
             neighbors.append([index,n])
-        
+
     #print("FINDEDGES FUNC END\n")
     return neighbors #integer response
 
@@ -250,31 +256,31 @@ def FindEdges(image, intersections):
 def IdentfiyBlueEdgeIntersection(intersections, intersection, bluepoint ):
     #
     neighbors=[] #[index, distance]
-    
-    
+
+
     for bp in bluepoint: #for each blue edge
         #print("\nblueedge: ",bp)
-        
+
         closestIntersection=[-1, 9999999999999999]
-        
+
         for index, yx  in intersections: #for each other intersections
-            
+
             if index!=intersection[0]: #not same as origin
-                if DistanceToVector(intersection[1], bp, yx) < 50: #close enough to match
+                if DistanceToVector(intersection[1], bp, yx) < 30: #close enough to match ##USED TO BE 50
                     distance=Distance(yx,intersection[1]) #measure distance
                     #print("\n")
                     #print(index)
                     #print("Distance: ",distance)
                     #print("D to V: ",DistanceToVector(intersection[1], bp, yx))
                     #print("CI: ",closestIntersection[1])
-                   
-                    
+
+
                     if Distance(yx, bp) < Distance(yx,intersection[1]):#correct direction
                         #print("Correct Direction")
-                        
+
                         if distance<closestIntersection[1]: #closest to originating intersection
                             closestIntersection=[index, distance]
-                
+
         neighbors.append(closestIntersection)
         #print("\nNeighbors: ",neighbors)
     return neighbors
@@ -289,7 +295,7 @@ def loadGraph(np_frame, file_name):
 
     print("loading: ",file_name)
     G = nx.Graph()
-    
+
     with open(file_name, mode='r') as file:
         csvFile = csv.reader(file)
         next(csvFile)
@@ -306,12 +312,12 @@ def loadGraph(np_frame, file_name):
                 coord = lines[1].replace(",", "").replace("(","").replace(')','') #remove non-numeric digits "###, ##"
                 coordX, coordY = [int(i) for i in coord.split() if i.isdigit()] #split into 2 vars
                 #coord = ( int(lines[1][0]), int(lines[1][1]) )
-                
-                
+
+
                 G.add_node(int(lines[0]), pos=(coordX, coordY))
 
-            
-            elif edge==1:   
+
+            elif edge==1:
                 #print("edge==1")
                 #print(lines)
                 G.add_edge(int(lines[0]), int(lines[1]), weight=int(lines[2]))
@@ -384,7 +390,7 @@ def LoadImageIntoGraph(image):
     #check for graph.csv existence
     dir_name='./maps/'
 
-    
+
 
     csvFile=image[:-4]+"Graph.csv" #DCRedBlue.csv
     #print("Saving to file: ",csvFile)
@@ -416,7 +422,7 @@ def LoadImageIntoGraph(image):
 
         intersections=[] #nodes
         for y in range(10,np_frame.shape[0], 2): #skip every other line
-            for x in range(10,np_frame.shape[1], 2): #skip every other line  
+            for x in range(10,np_frame.shape[1], 2): #skip every other line
                 if np_frame[y][x][0]>np_frame[y][x][1]+100: #Is it Red?
                     isolated=True
                   #
@@ -424,7 +430,7 @@ def LoadImageIntoGraph(image):
                     for index, yx in intersections:
                         if Distance(yx,[y,x]) <50:
                             isolated=False
-                 
+
                     if isolated == True:
                         #print("RED:\t", y,", ",x) #
                         #quit()
@@ -435,8 +441,8 @@ def LoadImageIntoGraph(image):
                             #print("LoadImageIntoGraph: perimeterList:\t",perimeterList)
                             perimeterList = findPerimeter(np_frame,y,x,perimeterList) #find all perimeters of circle
                             #print("LoadImageIntoGraph: AFTER FINDPERIMETER() (Should be Ring) -- perimeterList:\t",perimeterList)
-                            
-                            #find mean
+
+                            #find mean of perimeter, result should be center of red circle
                             result=np.mean(perimeterList, axis=0)
                             tooClose=False
                             for id, yx in intersections:
@@ -452,12 +458,12 @@ def LoadImageIntoGraph(image):
         for id, yx in intersections:
             print(id,":\t",yx)
 
-        
+
         #for count, i in enumerate(intersections):
             #print("Intersection [",count,"]: ",i)
         #for i in range(0,len(intersections)):
-        #    print(i,": ",intersections[i][1])          
-                    
+        #    print(i,": ",intersections[i][1])
+
         ##plot intersections
         #plt.imshow(np_frame)
         #for index, yx in intersections:
@@ -468,20 +474,21 @@ def LoadImageIntoGraph(image):
         #get edges
         #quit()
         edges=FindEdges(np_frame, intersections) #Edges= [[index, [neighbors]]] #neighbors=[index,distance]
-        
+
         G = nx.Graph()
 
         #create nodes
         for index, yx in intersections:
             G.add_node(index,pos=(yx[1],yx[0]))
-            
+
         #create edges
         for index, edge in edges:
             for index2, distance in edge:
                 if index2>index: ##for only 1 edge between
                     G.add_edge(index,index2,weight=int(distance))
+                    #print(index," <--> ", index2," ~ ",int(distance))
 
-        
+
         saveGraph(G, file_name) #write to csv
 
 
@@ -494,10 +501,9 @@ def isBetween(a, b, c):
     #print(a)
     #print(b)
     #print(c)
-    
+
     if (abs(Distance(a,b)+Distance(b,c)-Distance(a,c))<1): #epsiolon=1
         #print("IS BETWEEN")
         return True
     #print("NOT BETWEEN")
     return False
-

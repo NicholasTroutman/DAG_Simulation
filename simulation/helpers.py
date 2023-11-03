@@ -221,6 +221,7 @@ def csv_export(self, file_name):
             #line.append(0) ## line.append(transaction.weight_update_time)
             line.append(len(list(nx.descendants(self.DG, block)))/(block.id+0.001)) #adoption_rate
             block.blockTransactions = sorted(block.blockTransactions,key=lambda x: x.id) #sort blockTransactions before printing
+            #print("\n\n",block.id, ".blockTransactions: ",block.blockTransactions)
             line.append(block.blockTransactions)
 
             txtimes = []

@@ -18,8 +18,8 @@ def print_info(self):
             ",  Lambda = " + str(self.lam)
     if(self.tip_selection_algo == "weighted-genesis" or "weighted-entry-point"):
         text += ",  Alpha = " + str(self.alpha)
-    if(self.no_of_agents != 1):
-        text += ",  Distances = " + str(self.distances)
+    #if(self.no_of_agents != 1):
+    #    text += ",  Distances = " + str(self.distances)
     text += " | Simulation started...\n"
     print(text)
 
@@ -280,7 +280,7 @@ def print_coordinates_img(self, agents, time, backgroundImg):
         plt.plot(linex,liney,color=colors[index]) #past positions
 
         #plot radius
-        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),60, color='black', fill=False)
+        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),agent.radius, color='black', fill=False)
         ax.add_artist(circle)
 
         if time>0:
