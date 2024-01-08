@@ -1,10 +1,10 @@
 import traceback
 from simulation.block import DAGBlock, LinearBlock
-
+import sys
 
 #Node is a base class that mobile agents and immobile base stations inherit common functions from
 class Node:
-    def __init__(self, _counter):
+    def __init__(self, _counter, _map):
         self.id = _counter
         #self._visible_transactions = [] ##visible blocks instead in this block setup
         #self.coordinates= [] #list of double x and y coordinates in double [x,y] #agent specific
@@ -17,14 +17,19 @@ class Node:
         self.tradeTime = []
         self.witness = False
         self.coordinates= [] #list of double x and y coordinates in double [x,y]
-        self.radius=18.63 #hardcoded radius of p2p connectivity
-        ##Houston Distance: 500ft/88 pixels = 5.681818 ft/pixel
-        ##Wifi Distance = 150-300 ft, call it 250ft --> 250/5.68 = 44.01
+        #self.radius=18.63 #hardcoded radius of p2p connectivity
+
+        radiusDic = {"Houstonredblue.jpg": 44, "HoustonHwyredblue.jpg": 27.96}
+        ##Houston Downtown Distance: 500ft/88 pixels = 5.681818 ft/pixel
+        ##Wifi Downtown Distance = 150-300 ft, call it 250ft --> 250/5.68 = 44.01
 
         ##Houstonhwy Distance: 2*5280ft/60 pixels = 176 ft/pixel
         ##Wifi Distance = 150-300 ft, call it 300ft --> 300/176 = 1.7
-        ##LPWAN Distance = 2km, call it 1km ~ 3280ft -->  3280/176 = 18.63
+        ##LPWAN Distance = 2km, call it 1.5km ~ 4921ft -->  4921/176 = 27.96
 
+        self.radius=radiusDic[_map] #hardcoded radius of p2p connectivity
+        #print(self.radius)
+        #sys.exit("DEBUG")
 
         #transaction variables
         self._visible_transactions=[]
@@ -33,8 +38,8 @@ class Node:
 
         #block variables
         self._visible_blocks = []
-        self._confirmed_blocks = []
-
+        #self._confirmed_blocks = []
+        self._linked_blocks = []
         #For analysis
         self.agent_average_confirmation_confidence = 0
         self.tips = []
@@ -135,7 +140,8 @@ class Node:
                 changeMade = True
                 #print("appended to vis_txs: ",self._visible_blocks)
 
-            if block in self._visible_blocks and block in self._confirmed_blocks: #remove from visible if in confirmed
+            #if block in self._visible_blocks and block in self._confirmed_blocks: #remove from visible if in confirmed
+            if block in self._visible_blocks and block in self._linked_blocks: #remove from visible if in confirmed
                 self._visible_blocks.remove(block)
 
             #move confirmed txs for linear/DAG blockchain
@@ -146,30 +152,34 @@ class Node:
 
 
 
-    def add_confirmed_blocks(self, new_blocks, time): #no return
+    #def add_confirmed_blocks(self, new_blocks, time): #no return
+    def add_linked_blocks(self, new_blocks, time): #no return
         #print("\nadd_confirm_block begin: ", time)
         #print("new: ",new_blocks)
         #print("old: ",self._confirmed_blocks)
 
-        newest_blocks = list(set(new_blocks) - set(self._confirmed_blocks))
+        #newest_blocks = list(set(new_blocks) - set(self._confirmed_blocks))
+        newest_blocks = list(set(new_blocks) - set(self._linked_blocks))
         #print("newest! :",newest_blocks)
         for block in newest_blocks:
             #print(block," ",block.seen[self.id])
             if block.seen[self.id] == "":
                 #print("\nUNSEEN: ", block,"\n")
                 block.seen[self.id] = time
-                self._confirmed_blocks.append(block)
+                self._linked_blocks.append(block)
                 #print("appended to confirmed_blocks: ",self._confirmed_blocks)
 
-            if block in self._visible_blocks and block in self._confirmed_blocks: #remove from visible if in confirmed
-                    self._visible_blocks.remove(block)
-                    #print("removing block from vis_blocks")
+            ##Removing: remove from visible_blocks because confirmed_blocks will be used as LINKED blocks from now on
+            if block in self._visible_blocks:
+                self._visible_blocks.remove(block)
+                if block not in self._linked_blocks: #remove from visible if in
+                    self._linked_blocks.append(block)
             #move confirmed txs for linear/DAG blockchain
             if isinstance(block, (DAGBlock, LinearBlock)):
                 self.confirmTxs(block.confirmedBlocks, time)
 
     def confirm_all_vis_blocks(self, time):
-        self._confirmed_blocks = self._confirmed_blocks + self._visible_blocks
+        self._linked_blocks = self._linked_blocks + self._visible_blocks
         self._visible_blocks = [] #empty it out
 
 #Confirm TXS
@@ -194,9 +204,11 @@ class Node:
     def get_visible_blocks(self): #return vis blocks
         return self._visible_blocks
 
-    def get_confirmed_blocks(self):
-        return self._confirmed_blocks
+    #def get_confirmed_blocks(self):
+        #return self._confirmed_blocks
 
+    def get_linked_blocks(self):
+        return self._linked_blocks
 
     def get_visible_transactions(self): #return vis txs
         return self._visible_transactions

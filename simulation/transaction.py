@@ -53,3 +53,5 @@ class DHTTransaction(Transaction):
         self.hash =int(hashlib.sha256(str(self.id).encode('utf-8')).hexdigest(), 16) % 10**8
         self.verifier = _consensusCode[self.hash%len(_consensusCode)] #assign verifier
         self.used = False
+        self.signed =False
+        self.signedTime = -1

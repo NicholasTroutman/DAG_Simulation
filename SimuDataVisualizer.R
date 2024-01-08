@@ -8,9 +8,12 @@ library(reshape2)
 
 
 ##upload csv as simuData
-simuData=test
+simuData=testtest
 #simuData=dhtTest
 
+
+
+# Section PreProcesssing -------------
 #get number of agents
 agentSeen = grepl("agent_", names(simuData)) #index for 
 numAgents=sum(grepl("agent_",names(simuData))) #grep "agent_" from headers of simuData
@@ -29,6 +32,9 @@ plot(simuData$ID, simuData$adoption_rate, col=simuData$singleAgent, pch=16)
 plot(simuData$ID, simuData$count, col=simuData$singleAgent, pch=16)
 #plot(simuDataOpt$txID, simuDataOpt$count, col=simuData$agent, pch=16) #SAME
 
+
+
+
 ##time to share blocks:
 agentSeendf = data.frame(simuData[agentSeen])[-1,]
 shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
@@ -43,10 +49,10 @@ h<-hist(shareTimes, breaks=30)
 
 #overlay kernel density plot
 #lines(x=d$x,y=max(h$counts)*d$y/dx)
-lines(x=d$x,y=d$y*length(shareTimes)*1)
+lines(x=d$x,y=d$y*length(shareTimes)*(h$breaks[2] - h$breaks[1]))
 #new plot
 plot(d)
-
+lines()
 # Data
 set.seed(5)
 
@@ -61,21 +67,292 @@ ggplot(df, aes(x = shareTimes)) +
 
 
 ##Compare two kernels
-plot(d, "Full Network Penetration Time",xlab="Time", col="blue")
-lines(linearD2,col="red")
-legend(0,0.035, legend=c("DownTown", "HighWay"), col=c("blue","red"), lty=1, cex=1)
+plot(dhwy, "Map Difference ~ Full Network Penetration Time",xlab="Time", col="blue", xlim=c(0,300))
+lines(d,col="red")
+legend(225,0.039, legend=c("DownTown", "HighWay"), col=c("red","blue"), lty=1, cex=1)
 
 
 
 
-##PROPORTION OF CONFIRMED BLOCKS/Tot(blocks)
-percentConfirmedBlocks = sum(simuData$confirmedBlock=="True")/nrow(simuData)
-print(percentConfirmedBlocks)
+# Section PROPORTION OF CONFIRMED BLOCKS/Tot(blocks) ------
+library( plyr )
 
-##Proportion of confirmed Txs
+
+file_list = list.files(pattern="*.csv")
+#data_list <- vector("list", "length" = length(file_list))
+blockTimeList <- data.frame(matrix(ncol = 2, nrow = length(file_list)))
+colnames(blockTimeList) <- c("BlockTime", "ConfirmationPercentage")
+currentBlockTime = 10
+
+#loop through all files
+for (i in seq_along(file_list)) {
+  filename = file_list[[i]]
+  print(filename)
+  ## Read data in
+  df1 <- read.csv(filename, header = TRUE)
+  
+  ## Extract year from filename
+  #year = gsub("yob", "", filename)
+  #df[["Filename"]] = year
+  df = head(df1,-10)
+  percentConfirmedBlocks = sum(df$confirmedBlock=="True")/nrow(df)
+  #print(percentConfirmedBlocks)
+  ## Add year to data_list
+  blockTimeList$ConfirmationPercentage[i] = percentConfirmedBlocks
+  blockTimeList$BlockTime[i] = currentBlockTime
+  currentBlockTime = currentBlockTime+5
+}
+
+
+plot(blockTimeList$BlockTime,blockTimeList$ConfirmationPercentage)
+plot(blockTimeList$BlockTime,1-blockTimeList$ConfirmationPercentage, main="Block Orphanage Rate Vs. Mean Block Time", xlab="Mean Block Time (Exponential Distribution)", ylab="Orphanage Rate", ylim=c(0,1), pch=19)
+
+
+
+
+
+
+# Section Time to confirm each TX (1 data frame) ---------
+txConfirmationTime =  c()
+##add to listblockConfirmationTime-txCreationTime
+confirmedBlocks = simuData[simuData$confirmedBlock=="True",]
+for (i in 2:nrow(confirmedBlocks)){
+  #print(confirmedBlocks$ID[i])
+  tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[i], ",")[[1]] #returns 1, 2 3
+  #print(tx_creation_time)
+  ###tx_creation_time is list of strings
+  for (tct in tx_creation_time){
+    tct = gsub("[^0-9.-]", "", tct)
+    #print(strtoi(tct))
+    txConfirmationTime = append( txConfirmationTime, strtoi(confirmedBlocks$confirmationTime[i]) - strtoi(tct) )
+    #txConfirmationTime = c( txConfirmationTime, confirmedBlocks$confirmationTime - strtoi(tct) )
+  } 
+}
+
+h<-hist(txConfirmationTime, breaks=40)
+
+
+d <- density(txConfirmationTime, na.rm=TRUE)
+lines(x=d$x,y=d$y*length(txConfirmationTime)*(h$breaks[2] - h$breaks[1]))
+
+
+
+
+
+
+
+
+
+
+
+# Section Compare Network Penetration w/ different Agent #s ------
+
+file_list = list.files(pattern="*.csv")
+#data_list <- vector("list", "length" = length(file_list))
+numAgentsData <- data.frame(matrix(ncol = 7, nrow = length(file_list)))
+colnames(numAgentsData) <- c("numAgents", "distributionX","distributionY", "meanMaximumPenetrationTime", "times", "expectedConfirmation", "orphanageRate")
+currentNumAgents = 10
+
+#loop through all files
+for (i in seq_along(file_list)) {
+  filename = file_list[[i]]
+  print(filename)
+  ## Read data in
+  df <- read.csv(filename, header = TRUE)
+  
+  
+  #Get data
+  agentSeen = grepl("agent_", names(df)) #index for 
+  agentSeendf = data.frame(df[agentSeen])[-1,]
+  shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
+  d <- density(shareTimes, na.rm=TRUE, from=0, to = 200 )
+  #d <- density(shareTimes, na.rm=TRUE )
+  
+  ##save data
+  numAgentsData$numAgents[i] = currentNumAgents
+  numAgentsData$distributionX[i] = list(d$x)
+  numAgentsData$distributionY[i] = list(d$y)
+  numAgentsData$meanMaximumPenetrationTime[i] = d$x[match(max(d$y),d$y)]
+  numAgentsData$times[i] = list(shareTimes)
+  
+  
+  ##Get TX Confirmation TIme data
+  confirmedBlocks = df[df$confirmedBlock=="True",]
+  for (j in 2:nrow(confirmedBlocks)){
+    tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[j], ",")[[1]] #returns 1, 2 3
+    #print(tx_creation_time)
+    ###tx_creation_time is list of strings
+    for (tct in tx_creation_time){
+      #print(tct)
+      tct = gsub("[^0-9.-]", "", tct)
+      txConfirmationTime = append( txConfirmationTime, strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct) )
+      #txSubmissionTime =   append(txSubmissionTime,    strtoi(confirmedBlocks$arrival_time[j])    - strtoi(tct))
+    } 
+  }
+  
+  
+  
+  #Get Expected Confirmation Time
+  numAgentsData$expectedConfirmation[i] = 0
+  meanTime = mean(txConfirmationTime, na.rm=TRUE)
+  orphanRate = sum(df$confirmedBlock=="False")/nrow(df)
+  numAgentsData$orphanageRate[i]=orphanRate
+  for (n in 1:50){
+    temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-orphanRate)*(orphanRate**(n-1) ))
+    #print(temp)
+    numAgentsData$expectedConfirmation[i] = numAgentsData$expectedConfirmation[i] + temp
+  }
+  
+  
+  currentNumAgents = currentNumAgents +5
+  if (i==1){
+    plot(d,ylim=c(0,0.05))
+  }
+  else{
+    lines(d,add=TRUE)
+  }
+}
+
+
+
+
+
+###heatmap
+library(ggplot2)
+library(hrbrthemes)
+
+
+
+## real data
+x <- d$x
+y <- c(10, 15 ,20,25,30,35,40,45,50,55,60,100)
+data <- expand.grid(X=x, Y=y)
+data$Z <- c(numAgentsData$distributionY[[1]],  numAgentsData$distributionY[[2]], numAgentsData$distributionY[[3]], numAgentsData$distributionY[[4]], numAgentsData$distributionY[[5]], numAgentsData$distributionY[[6]], numAgentsData$distributionY[[7]],  numAgentsData$distributionY[[8]],  numAgentsData$distributionY[[9]],  numAgentsData$distributionY[[10]],  numAgentsData$distributionY[[11]], numAgentsData$distributionY[[12]])
+
+# Heatmap 
+ggplot(data, aes(X, Y, fill= Z)) + 
+  geom_tile() + scale_fill_gradient(low="white",high="red")
+
+
+
+
+
+### Network Penetration
+boxplot(numAgentsData$times, names = numAgentsData$numAgents, main="Network Penetration ~ Number of Agents", horizontal=TRUE, ylab="Number of Agents", xlab="Maximum Network Penetration Time")
+library(vioplot)
+vioplot(numAgentsData$times, names = numAgentsData$numAgents, main="Network Penetration ~ Number of Agents", horizontal=TRUE, ylab="Number of Agents", xlab="Maximum Network Penetration Time")
+
+##Tx Confirmation Time
+ggplot(numAgentsData, aes( y=expectedConfirmation, x=numAgents)) + 
+  geom_bar(position="dodge", stat="identity") +
+  ggtitle("BlockChain Expected Confirmation Time ~ Number of Agents") +
+  theme(plot.title = element_text(size=30))
+
+
+
+# Section DAG References VS txConfirmationTime VS submission Time ----------
+
+file_list = list.files(pattern="*.csv")
+#data_list <- vector("list", "length" = length(file_list))
+refData <- data.frame(matrix(ncol = 4, nrow = length(file_list)))
+colnames(refData) <- c("references", "cTime", "orphanRate", "expectedConfirmation")
+numReferences = 1
+#######Time to confirm each TX:
+
+
+#loop through all files
+for (i in seq_along(file_list)) {
+  txConfirmationTime =  c()
+  #txSubmissionTime = c()
+  filename = file_list[[i]]
+  print(filename)
+  ## Read data in
+  df <- read.csv(filename, header = TRUE)
+  df = head(df,-20)
+  confirmedBlocks = df[df$confirmedBlock=="True",]
+  
+  
+  ##Get Data
+  for (j in 2:nrow(confirmedBlocks)){
+    tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[j], ",")[[1]] #returns 1, 2 3
+    #print(tx_creation_time)
+    ###tx_creation_time is list of strings
+    for (tct in tx_creation_time){
+      tct = gsub("[^0-9.-]", "", tct)
+      #print(tct)
+      txConfirmationTime = append( txConfirmationTime, strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct) )
+      #txSubmissionTime =   append(txSubmissionTime,    strtoi(confirmedBlocks$arrival_time[j])    - strtoi(tct))
+    } 
+  }
+  
+  
+  ##save data
+  refData$references[i] = numReferences
+  refData$cTime[i] = list(na.omit(txConfirmationTime))
+  refData$orphanRate[i] = 1-(nrow(confirmedBlocks)/nrow(df))
+  meanTime =mean(txConfirmationTime, na.rm=TRUE)
+  reSubmitTime = mean(txConfirmationTime, na.rm=TRUE) + sd(txConfirmationTime, na.rm=TRUE)*2
+  
+  #get expected Confirmation Time
+  refData$expectedConfirmation[i] = 0
+  for (n in 1:50){
+    temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-refData$orphanRate[i])*(refData$orphanRate[i]**(n-1) ))
+    
+    #print(temp)
+    refData$expectedConfirmation[i] = refData$expectedConfirmation[i] + temp
+     }
+    
+  numReferences = numReferences + 1
+}
+
+##Boxplots
+
+##confirmation Time
+boxplot(refData$cTime, names = refData$references, main="Reference Tx Confirmation Time (PoL)", horizontal=TRUE, ylab="Number of References", xlab="Transaction Confirmation Time")
+text(x=fivenum(refData$cTime), labels=fivenum(refData$cTime), y=1.25)
+library(vioplot)
+vioplot(refData$cTime, names = refData$references, main="Reference Tx Confirmation Time", horizontal=TRUE, ylab="Number of References", xlab="Transaction Confirmation Time")
+
+##Submission Time
+boxplot(refData$sTime, names = refData$references, main="Reference Tx Submission Time", horizontal=TRUE, ylab="Number of References", xlab="Transaction Submission Time")
+library(vioplot)
+vioplot(refData$sTime, names = refData$references, main="Reference Tx Submission Time", horizontal=TRUE, ylab="Number of References", xlab="Transaction Submission Time")
+
+
+
+
+
+
+
+
+
+
+# Section time to share blocks: ---------------
+agentSeendf = data.frame(simuData[agentSeen])[-1,]
+shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
+shareTimesMedian = apply(agentSeendf, 1, FUN = median)  - apply(agentSeendf, 1, FUN = min)
+
+simuData$maxShareTime = c(0,shareTimes)
+d <- density(simuData$maxShareTime, na.rm=TRUE)
+dmedian <- density(shareTimesMedian, na.rm=TRUE)
+dx <- diff(d$x)[1]
+
+h<-hist(shareTimes, breaks=30)
+
+#overlay kernel density plot
+#lines(x=d$x,y=max(h$counts)*d$y/dx)
+lines(x=d$x,y=d$y*length(shareTimes)*(h$breaks[2] - h$breaks[1]))
+
+
+
+
+
+
+
+# Section Proportion of confirmed Txs ------------
 unconfirmedBlocks = simuData[simuData$confirmedBlock=="False",]
 numUncomfirmedTxs = 0
-for (i in 2:nrow(unconfirmedBlocks)){
+for (i in 1:nrow(unconfirmedBlocks)){
   tx_creation_time = strsplit(unconfirmedBlocks$transaction_creation_time[i], ",")[[1]] #returns 1, 2 3
   for (tct in tx_creation_time){
     numUncomfirmedTxs = numUncomfirmedTxs +1
@@ -84,9 +361,7 @@ for (i in 2:nrow(unconfirmedBlocks)){
 print(numUncomfirmedTxs) #num of unconfirmed Txs, divide by #stuff
 
 
-###PLOTS:
-
-##Get Agent/ID col=confirmed
+# Section et Agent/ID col=confirmed ------------
 plot(simuData$ID,simuData$singleAgent,col = ifelse(simuData$confirmedBlock =="False",'red','green'), pch = 16 )
 for (i in 2:nrow(simuData)){
  # print(i)
@@ -100,6 +375,9 @@ for (i in 2:nrow(simuData)){
 points(simuData$ID,simuData$singleAgent,col = ifelse(simuData$confirmedBlock =="False",'red','green'), pch = 19, cex=1.9 ) 
 
 
+
+# Section Transaction Submission Time -------
+
 ##Histogram of transaction submission time
 #for each row, get difference between simuData$arrival_time - simuData$transaction_creation_time
 txSubmissionTimeConfirmed = list()
@@ -109,6 +387,7 @@ for (i in 2:nrow(simuData)){
   #print(i)
     tx_creation_time = strsplit(simuData$transaction_creation_time[i], ",")[[1]] #returns 1, 2 3
   for (tct in tx_creation_time){
+    tct = gsub("[^0-9.-]", "", tct)
     newTST = ceiling(as.numeric(simuData$arrival_time[i])) - strtoi(tct)
     
     if (newTST < 1){
@@ -138,26 +417,6 @@ thruPlot+ggtitle("Throughput of Transactions (Linear Blockchain, DC)")+xlab("Tim
 
 
 
-# ##LOG PLOT
-#txTimes <- data.frame(matrix(ncol=2,nrow=0))
-#colnames(txTimes) <- c("time", "confirmed")
-#for (i in 1:length(txSubmissionTime2)){
-#  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTime2[i], "Unconfirmed")
-#}
-
-#for (i in 1:length(txSubmissionTimeConfirmed2)){
-#  txTimes[nrow(txTimes) + 1,] = list(txSubmissionTimeConfirmed2[i], "Confirmed")
-#}
-
-#thruPlot<-ggplot(melt(txTimes), aes(txTimes$time, fill = L1))+ geom_histogram(position = "stack", binwidth=3)
-#LOG WOKRED
-
-
-
-#dfr <- data.frame(x = rlnorm(length(bucket),sdlog = 5))
-#logPlot <- ggplot(dfr,aes(bucket))+ geom_histogram() + scale_x_log10()
-#logPlot
-
 
 #boxplot/violin plot
 library(vioplot)
@@ -168,178 +427,11 @@ ylab("Time")
 
 
 
-###Plot Confirmation Time
-library(plyr)
-#h <- hist(simuData$timeToConfirm,breaks=50)
-top = round_any( max(simuData$timeToConfirm,na.rm=TRUE),10)
-h <- hist(
-  simuData$timeToConfirm,
-  breaks = seq(0, top+5 , 5),
-  xlim = c(0,top))
-
-par(new = T)
-ec <- ecdf(simuData$timeToConfirm)
-
-plot(h)
-#plot(x = h$mids, y=ec(h$mids)*max(h$counts), col = rgb(0,0,0,alpha=0), axes=F, xlab=NA, ylab=NA)
-lines(x = h$mids, y=ec(h$mids)*max(h$counts), col ='red', lwd=2)
-axis(4, at=seq(from = 0, to = max(h$counts), length.out = 11), labels=seq(0, 1, 0.1), col = 'red', col.axis = 'red')
-mtext(side = 4, line = 3, 'Cumulative Density', col = 'red')
 
 
 
 
-
-
-
-
-
-##get tip time difference DOES NOT WORK CURRENTLY
-simuData2=simuData
-simuData2$timeDiff=99999
-for (i in 2:nrow(simuData2)){
-  #print("i Value")
-  print(i)
-  tips = simuData2$tips[i]
-
-  gsubbby= gsub("\\[|\\]", "", tips$tips)
-  tipList=as.numeric(strsplit(gsubbby, split=",", fixed=TRUE)[[1]])
-  #print("TIpList: ")
-  #print(tipList)
-  minTime=99999
-  for (tip in 1:length(tipList)){
-    print("TIP: ")
-    print(tipList[tip])
-    tempTime = as.numeric(simuData2[tipList[tip]+1,3])
-    #print(tempTime)
-    if (tempTime< minTime){
-
-      minTime=tempTime
-      }
-
-  }
-  simuData2[i,numAgents+9]=simuData2[i,3]-minTime
-  #break
-}
-
-
-
-plot(simuData2$txID[2:nrow(simuData2)], simuData2$timeDiff[2:nrow(simuData2)], col=simuData$agent, pch=16)
-
-##get timeLat ordered set
-simuData2=simuData
-timeLat = function(x){
-  #print(x)
-  agents = x[9:ncol(x)-1]
-  oTime = agents[order(as.matrix(agents),decreasing=FALSE)]
-  #oTimeLat = oTime[2:ncol(oTime)]-oTime[1]
-
-  #lat = map_dfc(select(otime, starts_with("agent")), ~ .x - otime[1])[2:ncol(otime)]
-  lat = t(apply(oTime, 1,  function(x, na.rm = TRUE) x - min(oTime,na.rm=TRUE)))
-  #print(oTime)
-  mean50=mean(as.matrix(lat[1:((ncol(lat)+1)*0.5)]))
-  mean75=mean(as.matrix(lat[1:((ncol(lat)+1)*0.75)]))
-  mean90=mean(as.matrix(lat[1:((ncol(lat)+1)*0.9)]))
-  return(c(mean50,mean75, mean90))
-
-}
-
-
-simuData3=simuData
-simuData3$lat50=NA
-simuData3$lat75=NA
-simuData3$lat90=NA
-for (i in 2:nrow(simuData2)){
-  print(i)
-  means=timeLat(simuData2[i,])
-  #print(means[1])
-  simuData3$lat50[i]=means[1]
-  simuData3$lat75[i]=means[2]
-  simuData3$lat90[i]=means[3]
-}
-
-
-##Plot lat
-
-#plot(simuData3$txID, simuData3$lat50, col=simuData3$agent, pch=16)
-#plot(simuData3$txID, simuData3$lat75, col=simuData3$agent, pch=16)
-#plot(simuData3$txID, simuData3$lat90, col=simuData3$agent, pch=16)
-
-##get ecdf's
-cdf50=ecdf(simuData3$lat50)
-#ecdf50Big=apply()
-
-##plot latency
-h50<- hist( simuData3$lat50, breaks=50, col=16)
-
-#lines(x = knots(cdf50), y=1:length(simuData3$lat50))/length(simuData3$txID) * max(h50$density), col='red' )
-lines(x = knots(cdf50),
-      y=(1:length(simuData3$lat50))/length(simuData3$lat50) * max(h50$density),
-      col ='red')
-
-hist( simuData3$lat75,  breaks=50)
-hist( simuData3$lat90,  breaks=50)
-
-##plot all histograms
-b<- min(c(simuData3$lat50,simuData3$lat75 ,simuData3$lat90),na.rm=TRUE)
-e <- max(c(simuData3$lat50,simuData3$lat75 ,simuData3$lat90),na.rm=TRUE)
-ax <- pretty(b:e, n = 60) # Make a neat vector for the breakpoints
-
-c1 <- rgb(173,216,230,max = 255, alpha = 100, names = "lt.blue")
-c2 <- rgb(255,192,203, max = 255, alpha = 100, names = "lt.pink")
-c3 <- rgb(34,212,46, max = 255, alpha = 100, names = "lt.green")
-
-hg50 <- hist(simuData3$lat50, breaks=ax, plot=FALSE)
-hg75 <- hist(simuData3$lat75, breaks=ax, plot=FALSE)
-hg90 <- hist(simuData3$lat90, breaks=ax, plot=FALSE)
-plot.new()
-plot(hg50, col = c1) # Plot 1st histogram using a transparent color
-plot(hg75, col = c2, add = TRUE) # Add 2nd histogram using different color
-plot(hg90, col = c3, add = TRUE) # Add 3rd histogram using different color
-
-##histogram+density curve
-plotDistribution = function (x) {
-  N = length(x)
-  x <- na.omit(x)
-  hist( x,col = "light blue", probability = TRUE, breaks=50)
-  lines(density(x), col = "red", lwd = 3)
-  rug(x)
-  print(N-length(x))
-}
-plot.new()
-plotDistribution(simuData3$lat50)
-plotDistribution(simuData3$lat75)
-#par(new = TRUE)
-plotDistribution(simuData3$lat90)
-
-##boxPlot + histogram
-hist(simuData3$lat50, freq = FALSE, main = "Density curve")
-axis(1) # Adds horizontal axis
-par(new = TRUE)
-boxplot(simuData3$lat50, horizontal = TRUE, axes = FALSE,lwd = 2, col = rgb(0, 0, 0, alpha = 0.2))
-
-
-
-
-
-##Test
-data <- data.frame(simuData3$lat50, simuData3$lat75, simuData3$lat90)
-colnames(data) <- c("50%", "75%", "90%")
-title=sprintf("Transaction Latency: %d Agents", numAgents)
-boxplot(data, main=title, ylab="Latency Time (Sec)", xlab="Network Penetration",col=c1)
-mean(simuData3$lat50,na.rm=TRUE)
-mean(simuData3$lat75,na.rm=TRUE)
-mean(simuData3$lat90,na.rm=TRUE)
-
-
-
-
-
-
-
-
-
-
+# Section Find blocks Including a specific TX ------
 
 found=0
 
@@ -355,3 +447,285 @@ for (i in 2:nrow(simuData)){
   }
 }
 
+
+# Section grouped Bargraphs ----------
+
+
+##grouped barGraph
+library(ggplot2)
+#mock Data
+specie <- c(rep("sorgho" , 3) , rep("poacee" , 3) , rep("banana" , 3) , rep("triticum" , 3) )
+condition <- rep(c("normal" , "stress" , "Nitrogen") , 4)
+value <- abs(rnorm(12 , 0 , 15))
+data <- data.frame(specie,condition,value)
+
+
+#real data
+links <- unlist(rep(list("1","2","3","4","5"),3))
+consensus <- c(rep("30sec", 5), rep("10sec", 5), rep("PoL", 5))
+orphanRate <- c( c(0.614, 0.0715, 0, 0, 0), c(0.36, 0.195, 0.00025, 0,0), c(0.36, 0, 0, 0, 0) )
+eConf <- c( c(1074, 855, 608, 601, 598), c(1075, 543, 543, 505, 498 ), c(221, 161, 161, 161, 161))
+dagData <- data.frame(links, consensus, orphanRate, eConf)
+
+ggplot(dagData, aes( y=eConf, x=links, fill=consensus)) + 
+  geom_bar(position="dodge", stat="identity") +
+  ggtitle("DAG Expected Confirmation Time") +
+  theme(plot.title = element_text(size=30))
+
+
+
+
+
+# Section Get Penetration Distributionsfrom folder ----------
+
+
+file_list = list.files(pattern="*.csv")
+#data_list <- vector("list", "length" = length(file_list))
+#refData <- data.frame(matrix(ncol = 4, nrow = length(file_list)))
+refData <- data.frame(matrix(ncol = 10 , nrow = length(file_list)))
+#colnames(refData) <- c("blockTime", "cTime", "orphanRate", "expectedConfirmation")
+colnames(refData) <- c("blockTime", "numAgents","maps","dlt", "refs", "cTime", "orphanRate", "meanPenTime", "penTimes", "group")
+#######Time to confirm each TX:
+
+
+#loop through all files
+for (i in seq_along(file_list)) {
+#for (i in 1) {
+  econfList = c()
+  txConfirmationTime =  c()
+  #txSubmissionTime = c()
+  filename = file_list[[i]]
+  print(paste(filename," ~ ",i/length(file_list)))
+  ## Read data in
+  df <- read.csv(filename, header = TRUE)
+  df = head(df,-50)
+  
+  agentSeen = grepl("agent_", names(df)) #index for 
+  agentSeendf = data.frame(df[agentSeen])[-1,]
+  shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
+  confirmedBlocks = df[df$confirmedBlock=="True",]
+  
+  
+  ##Get Data
+  for (j in 2:nrow(confirmedBlocks)){
+    tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[j], ",")[[1]] #returns 1, 2 3
+    #print(tx_creation_time)
+    ###tx_creation_time is list of strings
+    for (tct in tx_creation_time){ #tct = Transaction creation time
+      tct = gsub("[^0-9.-]", "", tct) 
+      #print(tct)
+      #print(strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct) )
+      txConfirmationTime = append( txConfirmationTime, strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct) )
+      #txSubmissionTime =   append(txSubmissionTime,    strtoi(confirmedBlocks$arrival_time[j])    - strtoi(tct))
+    } 
+  }
+  
+  
+  ##save data
+  refData$blockTime[i] = as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][5])
+  refData$cTime[i] = list(na.omit(txConfirmationTime))
+  refData$orphanRate[i] = 1-((nrow(confirmedBlocks)+1)/nrow(df))
+  refData$numAgents[i] =   as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][3]) ##numAgents
+  refData$dlt[i] =  strsplit(gsub("_", " ",filename), " +")[[1]][2]
+  refData$maps[i] = strsplit(gsub("_", " ",filename), " +")[[1]][13]
+  refData$refs[i] = as.numeric(substr(strsplit(gsub("_", " ",filename), " +")[[1]][17], 1, 1))
+  refData$group[i] = as.numeric(substr(strsplit(gsub("_", " ",filename), " +")[[1]][19], 1, 1))
+  refData$meanPenTime[i] = mean(shareTimes, na.rm=TRUE)
+  refData$penTimes[i] = list(na.omit(shareTimes))
+  
+  meanTime =mean(txConfirmationTime, na.rm=TRUE)
+  reSubmitTime = meanTime + sd(txConfirmationTime, na.rm=TRUE)*2
+  #get expected Confirmation Time
+  refData$expectedConfirmation[i] = 0
+  for (n in 1:30){
+    temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-refData$orphanRate[i])*(refData$orphanRate[i]**(n-1) ))
+    econfList = append(econfList,temp)
+    refData$expectedConfirmation[i] = refData$expectedConfirmation[i] + temp
+  }
+  
+  #plot(seq_along(econfList), econfList, type="l", main=paste("BlockTime: ",refData$blockTime[i], " orphanRate: ",refData$orphanRate[i]))
+  
+}
+refData$color="darkred"
+
+for (i in 1:nrow(refData)){
+ # print(i)
+  
+  
+  print(refData$group[i])
+  
+  if (refData$group[i]==1){
+    refData$color[i]="darkred"
+  }
+  else if (refData$group[i]==3){
+    refData$color[i]="darkgreen"
+  }
+  else if (refData$group[i]==4){
+    refData$color[i]="darkblue"
+  }
+  else if (refData$group[i]==5){
+    refData$color[i]="darkorange"
+  }
+}
+
+refDatatot=refData
+refDataDownTown=refData[refData$maps=="Houstonredblue",]
+refDataHwy = refData[refData$maps=="HoustonHwyredblue",]
+
+
+##density plots
+d25 =  density(refDataDownTown$penTimes[[1]])
+d50 =  density(refDataDownTown$penTimes[[2]])
+d100 = density(refDataDownTown$penTimes[[3]])
+
+plot(d100, xlim=c(0,500))
+lines(d50)
+lines(d25)
+
+##Both hwy + Downtown
+#refDataHwy
+
+
+library(ggplot2)
+
+##plot expectedConfirmation Time
+refData=refDataHwy
+refData=refDataDownTown
+ggplot(refData, aes( y=expectedConfirmation, x=blockTime,group=numAgents,col = ifelse(numAgents < 50,'red',ifelse(numAgents>50,'blue','green'))), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste(refData$maps[1]," Minting Time ~ Expected Transaction Confirmation Time")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("25","50","100")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+
+
+##Plot ExpectedConfirmation Time by refs
+#refData=refData[refD]
+
+refData=refData[!refData$refs==4,]
+refData25=refData[refData$numAgents==25,]
+refData50=refData[refData$numAgents==50,]
+refData100=refData[refData$numAgents==100,]
+
+min(refData25$expectedConfirmation)
+min(refData50$expectedConfirmation)
+min(refData100$expectedConfirmation)
+
+refData2 =refDatatot[refDatatot$refs==2,]
+refData3 =refDatatot[refDatatot$refs==3,]
+refData4 =refDatatot[refDatatot$refs==4,]
+refData5 =refDatatot[refDatatot$refs==5,]
+refData6 =refDatatot[refDatatot$refs==6,]
+refData7 =refDatatot[refDatatot$refs==7,]
+#refData3s = rbind(refData25,refData50,refData100)
+library(ggplot2)
+
+
+
+
+ggplot(refData25, aes( y=expectedConfirmation, x=numAgents,group=refs, col = ifelse(refs == 2,'red','blue')), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown DAG 25 Agents, Minting Time ~ Expected Transaction Confirmation Time")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.35) +
+  scale_color_manual(name="Number of Refs",values=c('darkred','darkblue'), labels=c("3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))+ 
+  ylim(0,50)
+
+
+ggplot(refData50, aes( y=expectedConfirmation, x=blockTime,group=refs,col = ifelse(refs == 2,'red','blue')), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown DAG 50 Agents, Minting Time ~ Expected Transaction Confirmation Time")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab(" 50 Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.35) +
+  scale_color_manual(name="Number of Refs",values=c('darkred','darkblue'), labels=c("3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))+ 
+  ylim(0,550)
+
+
+ggplot(refData100, aes( y=expectedConfirmation, x=blockTime,group=refs,col = ifelse(refs == 2,'red','blue')), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown DAG 100 Agents, Minting Time ~ Expected Transaction Confirmation Time")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.4) +
+  scale_color_manual(name="Number of Refs",values=c('darkred','darkblue'), labels=c("3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  ylim(0,550)
+
+
+ggplot(refData, aes( y=expectedConfirmation, x=blockTime,group=refs,col = ifelse(refs == 2,'red','blue')), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown DAG 200 Agents, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.2) +
+  scale_color_manual(name="Number of Refs",values=c('darkred','darkblue'), labels=c("3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  ylim(0,1000)
+
+
+##Plot 2/3/4 attachment time
+
+ggplot(refDataHwy, aes( y=expectedConfirmation, x=blockTime, group=refs, col = ifelse(refs == 2, ifelse(refs == 3, 'green','blue'),'red')), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown DAG 200 Agents, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  scale_color_manual(name="Number of Refs",values=c('darkred','darkblue'), labels=c("4","3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  ylim(0,250)
+##geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.2) +
+
+
+refDataHwy50=refDataHwy[refDataHwy$numAgents==50,]
+refDataHwy100=refDataHwy[refDataHwy$numAgents==100,]
+
+
+ggplot(refDataHwy50, aes( y=expectedConfirmation, x=blockTime,group=refs, col = ifelse(refs == 2,'red',ifelse(refs==3,'blue','green'))), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle("50 AGents Minting Time ~ Expected Transaction Confirmation Time") +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("4","3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+
+
+
+ggplot(refDataHwy100, aes( y=expectedConfirmation, x=blockTime,group=refs, col = ifelse(refs == 2,'red',ifelse(refs==3,'blue','green'))), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle("100 AGents Minting Time ~ Expected Transaction Confirmation Time") +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("4","3","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+
+
+refDataDownTown50=refDataDownTown[refDataDownTown$numAgents==50,]
+refDataDownTown100=refDataDownTown[refDataDownTown$numAgents==100,]
+
+ggplot(refDataDownTown50, aes( y=expectedConfirmation, x=blockTime,group=refs, col = ifelse(refs == 2,'red',ifelse(refs==3,'blue','green'))), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle("50 AGents Minting Time ~ Expected Transaction Confirmation Time") +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+
+
+
+ggplot(refDataDownTown100, aes( y=expectedConfirmation, x=blockTime,group=refs, col = ifelse(refs == 2,'red',ifelse(refs==3,'blue','green'))), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle("100 AGents Minting Time ~ Expected Transaction Confirmation Time") +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))

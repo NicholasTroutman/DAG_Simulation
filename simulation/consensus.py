@@ -28,7 +28,7 @@ def get_valid_tips_multiple_agents(Multi_Agent_Simulation, agent):
             #Add to valid tips if transaction has no approvers at all
             #print(len(list(self.DG.predecessors(transaction))))
             if(len(list(Multi_Agent_Simulation.DG.predecessors(b))) == 0):
-                valid_tips.append(b) 
+                valid_tips.append(b)
 
             #Add to valid tips if all approvers not visible yet
             #elif(self.all_approvers_not_visible(transaction)):
@@ -39,7 +39,7 @@ def get_valid_tips_multiple_agents(Multi_Agent_Simulation, agent):
             elif(len(set(list(Multi_Agent_Simulation.DG.predecessors(b))).intersection(set(agent.get_visible_blocks()))) == 0): #if no predecssors of tx are in visible transaction
                 #print("\n\n!!!!!!! HASN'T SEEN NEW LINK YET !!!!\n\n")
                 valid_tips.append(b)
-        
+
     return valid_tips
 
 
@@ -78,8 +78,8 @@ def random_selection(Multi_Agent_Simulation, block):
     valid_tips = Multi_Agent_Simulation.get_valid_tips_multiple_agents(block.creators[0])
     block.creators[0].record_tips.append(valid_tips)
     Multi_Agent_Simulation.record_tips.append(valid_tips)
-    
-    
+
+
     ##error check print all transactions
     #print("\nAvailable Txs")
     #for tx in transaction.agent.visible_transactions:
@@ -91,11 +91,11 @@ def random_selection(Multi_Agent_Simulation, block):
     valid_tips2 = valid_tips.copy() #create copy to edit
     print("Valid Tips: ",valid_tips2)
     for count, tip in enumerate(valid_tips):
-        if count>7: #no more than 8 tips 
+        if count>7: #no more than 8 tips
             break
         tempTip = np.random.choice(valid_tips2) #get randomTip
         Multi_Agent_Simulation.DG.add_edge(block, tempTip) #add tip
-        valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
+        valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2
         block.blockLinks.append(tempTip)
 
 #############################################################################
@@ -109,7 +109,7 @@ def find_entry_point(Multi_Agent_Simulation, transaction):
         high = transaction.id - 100*Multi_Agent_Simulation.lam
         tx_idx = np.random.randint(low=low, high=high)
     return Multi_Agent_Simulation.transactions[tx_idx]
-        
+
 
 #############################################################################
 # TIP-SELECTION: UNWEIGHTED
@@ -123,7 +123,7 @@ def unweighted_MCMC(Multi_Agent_Simulation, transaction):
     #        self.get_visible_transactions(transaction.arrival_time, agent)
     #        valid_tips = self.get_valid_tips_multiple_agents(agent)
     #        agent.record_tips.append(valid_tips)
-    
+
     valid_tips = Multi_Agent_Simulation.get_valid_tips_multiple_agents(transaction.agent)
     transaction.agent.record_tips.append(valid_tips)
     Multi_Agent_Simulation.record_tips.append(valid_tips)
@@ -133,19 +133,19 @@ def unweighted_MCMC(Multi_Agent_Simulation, transaction):
     #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
     transaction.agent.record_tips.append(valid_tips)
     Multi_Agent_Simulation.record_tips.append(valid_tips)
-    
-    
+
+
     valid_tips2=valid_tips.copy() #create copy to edit
-    
+
     for count, tip in enumerate(valid_tips):
-        if count>7: #no more than 8 tips 
+        if count>7: #no more than 8 tips
             break
         #tempTip = np.random.choice(valid_tips2) #get randomTip
         tempTip = Multi_Agent_Simulation.unweighted_random_walk(transaction, valid_tips2)
         Multi_Agent_Simulation.DG.add_edge(transaction, tempTip) #add tip
-        valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2 
-        
-        
+        valid_tips2.remove(tempTip) #remove tempTip from working valid_tips2
+
+
     #Walk to two tips
     #tip1 = self.unweighted_random_walk(transaction, valid_tips)
     #tip2 = self.unweighted_random_walk(transaction, valid_tips)
@@ -195,8 +195,8 @@ def weighted_genesis_MCMC(Multi_Agent_Simulation, transaction):
     #valid_tips = self.get_valid_tips_multiple_agents(transaction.agent)
     #transaction.agent.record_tips.append(valid_tips)
     #self.record_tips.append(valid_tips)
-    
-    
+
+
     #Collect valid tips and record them
     valid_tips = Multi_Agent_Simulation.get_valid_tips_multiple_agents(transaction.agent)
     transaction.agent.record_tips.append(valid_tips)
@@ -396,20 +396,20 @@ def tip_selection(Multi_Agent_Simulation, transaction):
 ##Create block between N agents within close proximity
 def create_block_nearby(Multi_Agent_Simulation, agents, time): #radius=distance for tx transfer,
     print("\nCREATING BLOCK\n")
-    
-    
+
+
     print("Agents: ",agents)
     ##get all txs
     txs=[]
     for agent in agents:
         print("AGENT TXS: ",agent.get_visible_transactions())
         txs = list(set(txs) | set(agent.get_visible_transactions())) ##combine all freeTxs
-    
+
     print("TX Unions: ",txs)
     if txs==[]:
         print("No Txs for block")
         return
-    
+
     ##get links
     visBlocks=[]
     for agent in agents:
@@ -422,12 +422,12 @@ def create_block_nearby(Multi_Agent_Simulation, agents, time): #radius=distance 
     for agent in agents:
         agent.usedTxs=txs
         agent.freeTxs=[]
-    
+
     Multi_Agent_Simulation.DG.add_node(newBlock, pos=(newBlock.creation_time, \
             np.random.uniform(0, 1)+newBlock.creators[0].id*2), \
             node_color=Multi_Agent_Simulation.agent_colors[newBlock.creators[0].id])
-    
-    
+
+
     #choose tsa
     tip_selection(newBlock)
     for agent in agents:

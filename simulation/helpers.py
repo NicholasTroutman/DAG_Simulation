@@ -178,6 +178,62 @@ def load_file(filename):
     return data
 
 
+def routes_export(file_name, agents):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        for agent in agents:
+            writer.writerow(agent.destination)
+
+
+
+
+
+def routes_importer(simulation, file_name):
+    with open(file_name, 'r') as file:
+       reader = csv.reader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+       data_list = list(reader)
+       #print(data_list)
+       for index, readDestinations in enumerate(data_list):
+           simulation.agents[index].destination=readDestinations
+       #sys.exit("END ROUTES_IMPORTER")
+
+
+def confirmationLayer_importer(simulation, file_name):
+    with open(file_name, 'r') as file:
+       reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+       #data_list = list(reader)
+
+       for row in reader:
+           blockTime = row['blockTime']
+           numAgents = row['numAgents']
+           map = row['map']
+           dlt = row['dlt']
+           refs = row['refs']
+           consensus = row['consensus']
+           group = row['group']
+           #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+           #if consensus==simulation.consensus:
+               #if int(simulation.no_of_agents) == int(numAgents):
+                   #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+                   #print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap[:-4], " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ",simulation.group)
+
+
+
+           if (int(simulation.blockTime) == int(blockTime) and int(simulation.no_of_agents) == int(numAgents) and simulation.importMap[:-4] == map):
+               if (simulation.DLTMode == dlt and int(simulation.references) == int(refs)):
+
+                   if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                       return int(row['confirmationNumber'])
+            #sys.exit("MATCH DEBUGGING DONE")
+
+           #print(row['blockTime'], " ~ ",row['numAgents'])
+       if simulation.DLTMode =="dht" or simulation.DLTMode=="hashgraph":
+           print("DHT/Hashgraph no Confirmation Needed")
+           return int(3)
+       #sys.exit("No Confirmation Layer Found, RECOMPUTE")
+       print("NO CONFIRMATION LAYER FOUND, USE THESE RESULTS FOR COMPUTING CONFIRMATION LAYER")
+       return int(3)
+
 def csv_export(self, file_name):
 
     with open(file_name, 'w', newline='') as file:
@@ -195,7 +251,7 @@ def csv_export(self, file_name):
             for agentId, agentSeen in enumerate(transaction.seen):
                 header.append(str("agent_"+str(agentId+1)))
             break
-        print(header)
+        #print(header)
         writer.writerow(header) #add confirmation time +
         #Write genesis
         #writer.writerow([0,[],0, '', 0, 0])

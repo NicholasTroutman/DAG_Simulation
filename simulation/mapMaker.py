@@ -382,7 +382,7 @@ def saveGraph(G, file_name):
 
 ##take image, return full graph with nodes + edges
 def LoadImageIntoGraph(image):
-    print("LOAD IMAGE INTO GRAPH\n\n")
+    #print("LOAD IMAGE INTO GRAPH\n\n")
     im_frame = Image.open(image)
     np_frame = np.array(im_frame.getdata())
     np_frame.shape=(int(np_frame.shape[0]/im_frame.width), im_frame.width,  3) #x,y of the image
@@ -405,7 +405,7 @@ def LoadImageIntoGraph(image):
     #check if file already exists
     if os.path.isfile(file_name): #
         #print("CSV IS HERE\n\n\n\n")
-        print(file_name, " Already exists, Reading (LoadImageIntoGraph)\n\n")
+        #print(file_name, " Already exists, Reading (LoadImageIntoGraph)\n\n")
 
         #G = nx.Graph() #networkx graph
 

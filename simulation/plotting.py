@@ -120,7 +120,7 @@ def print_graph(self):
             elif transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
                 linked=list(nx.descendants(self.DG, transaction))
 
-                print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
+                #print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
                 col.append('maroon')
             else:
                 col.append(self.DG.nodes[transaction]["node_color"])
@@ -128,7 +128,7 @@ def print_graph(self):
             if transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
                 linked=list(nx.descendants(self.DG, transaction))
 
-                print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
+                #print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
                 col.append('maroon')
             else:
                 col.append(self.DG.nodes[transaction]["node_color"])

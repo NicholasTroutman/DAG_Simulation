@@ -1,3 +1,0 @@
-ID,confirmedBlock,confirmationTime,chainNum,confirmed_blocks,tips,arrival_time,agent,adoption_rate,block_transactions,transaction_creation_time,agent_1,agent_2,agent_3,agent_4,agent_5
-0,False,,0,[],[],0,[0],0.0,[],[],0,0,0,0,0
-1,False,,1,[],[0],22,[3],0.9990009990009991,"[7, 9, 10, 12, 13, 16, 17, 20]","[4, 5, 5, 7, 9, 11, 11, 13]",44,,,22,
