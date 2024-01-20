@@ -1,6 +1,6 @@
-# IOTA TANGLE SIMULATION
+# DLT SIMULATION
 
-This is a single- and multi-agent simulation of the IOTA Tangle, as described in the white-paper.
+This is a single-processor simulator of IoT-MANET environments with variable DLT architectures, environments, agent characteristics, and consensus algorithms.
 
 ## Getting Started
 
@@ -57,7 +57,7 @@ In this file you can also change the configurations of the simulation.
 
 ## Authors
 
-* Manuel Zander
+* Nicholas Troutman + Manuel Zander (IOTA TANGLE Simulator creator)
 
 ## License
 
@@ -65,4 +65,6 @@ See LICENSE.txt
 
 ## Acknowledgments
 
-Many thanks to Dominik Harz (nud3l) for his help and suggestions during development of this software.
+Thanks to my advisor Weidong (Larry) Shi at the University of Houston for guiding me and this project.
+
+(IOTA TANGLE SIMULATOR) Many thanks to Dominik Harz (nud3l) for his help and suggestions during development of this software.
