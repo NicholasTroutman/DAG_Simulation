@@ -112,11 +112,8 @@ class Multi_Agent_Simulation:
 
 
         ## Get confirmationLayer
-        print("!!!! FIX CONFIRMATION NUMBER")
-        if self.consensus=="individual":
-            self.confirmationNumber = 1
-        else:
-            self.confirmationNumber = confirmationLayer_importer(self, "confirmationLayer.csv")
+
+        self.confirmationNumber = confirmationLayer_importer(self, "confirmationLayer.csv")
         print("\nConfirmation Number: ", self.confirmationNumber)
 
     #############################################################################
@@ -428,7 +425,7 @@ class Multi_Agent_Simulation:
     def cleanOldTxsAndBlocks(self, transaction):
         lowerBound = 1500
         if self.consensus == "near":
-            lowerBound=2500
+            lowerBound=2000
         if self.DLTMode == "hashgraph":
             lowerbound = 2200
         currentTime = transaction.arrival_time

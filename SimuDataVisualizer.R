@@ -476,7 +476,7 @@ ggplot(dagData, aes( y=eConf, x=links, fill=consensus)) +
 
 
 
-# Section Get Penetration Distributionsfrom folder ----------
+# Section Get Penetration Distribution sfrom folder ----------
 
 
 file_list = list.files(pattern="*.csv")
@@ -536,14 +536,15 @@ for (i in seq_along(file_list)) {
   meanTime =mean(txConfirmationTime, na.rm=TRUE)
   reSubmitTime = meanTime + sd(txConfirmationTime, na.rm=TRUE)*2
   #get expected Confirmation Time
+  #refData$expectedConfirmation[i] = meanTime
   refData$expectedConfirmation[i] = 0
-  for (n in 1:30){
+  for (n in 1:20){
     temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-refData$orphanRate[i])*(refData$orphanRate[i]**(n-1) ))
     econfList = append(econfList,temp)
     refData$expectedConfirmation[i] = refData$expectedConfirmation[i] + temp
   }
   
-  #plot(seq_along(econfList), econfList, type="l", main=paste("BlockTime: ",refData$blockTime[i], " orphanRate: ",refData$orphanRate[i]))
+  plot(seq_along(econfList), econfList, type="l", main=paste("BlockTime: ",refData$blockTime[i], " orphanRate: ",refData$orphanRate[i]))
   
 }
 refData$color="darkred"
@@ -573,6 +574,97 @@ refDataDownTown=refData[refData$maps=="Houstonredblue",]
 refDataHwy = refData[refData$maps=="HoustonHwyredblue",]
 
 
+##SPlit by refs
+refDataDownTown2refs = refDataDownTown[refDataDownTown$refs==2,]
+refDataDownTown3refs = refDataDownTown[refDataDownTown$refs==3,]
+
+library(ggrepel)
+library(ggplot2)
+ggplot(refDataDownTown2refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  geom_label_repel(aes(label = group),box.padding   = 0.35, point.padding = 0.5,segment.color = 'grey50')+
+  ggtitle(paste("Downtown 2 Refs, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)+
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.8)
+
+ggplot(refDataDownTown2refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  geom_label_repel(aes(label = group),box.padding   = 0.35, point.padding = 0.5,segment.color = 'grey50')+
+  ggtitle(paste("Downtown 2 Refs, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)
+
+
+
+#INDIVIDUAL WORKS
+ggplot(refDataDownTown2refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown 2 Refs, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)+
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.7) + 
+  geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes(label = group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10)+
+  scale_x_continuous(breaks = round(seq(25, 200, by = 25),1))
+ 
+
+
+ggplot(refDataDownTown3refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown 3 Refs, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)+
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.7 ,linetype="solid") + 
+  geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes(label = group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10)+
+  scale_x_continuous(breaks = round(seq(25, 200, by = 25),1)) 
+
+##combiNED
+ggplot() + 
+  geom_point(data = refDataDownTown2refs,aes( y=expectedConfirmation, x=numAgents, group=group, col=group), pch = 5,  position="dodge", stat="identity") +
+  geom_smooth(data= refDataDownTown2refs, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.7 ,aes( y=expectedConfirmation, x=numAgents, group=group, col=group,linetype='2'), size=0.9) +
+  geom_point(data = refDataDownTown3refs,aes( y=expectedConfirmation, x=numAgents, group=group, col=group), pch = 19,  position="dodge", stat="identity") + 
+  geom_smooth(data= refDataDownTown3refs, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.7,aes( y=expectedConfirmation, x=numAgents, group=group, col=group,linetype='3'), size=1.6)+
+  ggtitle(paste("Downtown DAG PoL ~ ETC")) +
+  labs(x="Number of Agents", y="Expected Transaction Confirmation", col="Groups",linetype="# of References")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+  scale_color_gradient(low="blue", high="red") +
+  scale_linetype_manual(values=c('2'='dashed','3'='solid')) + 
+  ylim(0,175) + 
+  geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10) + 
+  scale_x_continuous(breaks = c(25,50,100,150,200))+ 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9), axis.line = element_line(colour = "black"), legend.title=element_text(face = "bold"),legend.key.width = unit(2,"cm"))
+
+#Linear Near Plot
+ggplot(refData, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  ggtitle(paste("Downtown 3 Refs, Minting Time ~ ETC")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)+
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.7 ,linetype="solid") + 
+  geom_label_repel(data=refData[c(1:3,10,11,12,13,16),], aes(label = group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10)+
+  scale_x_continuous(breaks = round(seq(25, 200, by = 25),1)) 
+
+
+
+#theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) +
+#geom_text(hjust=1,vjust=1) +
+#geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
+#scale_color_manual(name="Group",values=c('darkred','darkgreen','darkblue'), labels=c("25","50","100")) +
+
 ##density plots
 d25 =  density(refDataDownTown$penTimes[[1]])
 d50 =  density(refDataDownTown$penTimes[[2]])
@@ -598,7 +690,8 @@ ggplot(refData, aes( y=expectedConfirmation, x=blockTime,group=numAgents,col = i
   xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
   geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
   scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("25","50","100")) +
-  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+
 
 
 ##Plot ExpectedConfirmation Time by refs
@@ -712,11 +805,11 @@ refDataDownTown100=refDataDownTown[refDataDownTown$numAgents==100,]
 
 ggplot(refDataDownTown50, aes( y=expectedConfirmation, x=blockTime,group=refs, col = ifelse(refs == 2,'red',ifelse(refs==3,'blue','green'))), pch = 19) + 
   geom_point(position="dodge", stat="identity") +
-  ggtitle("50 AGents Minting Time ~ Expected Transaction Confirmation Time") +
-  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
-  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  ggtitle("50 Agents Minting Time ~ Time to Reference") +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4)) + 
+  xlab("Block Minting Time") + ylab("Expected Time to Reference (with resubmission)") +
   geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
-  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
+  scale_color_manual(name="Number of References",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
   scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
 
 
@@ -727,5 +820,148 @@ ggplot(refDataDownTown100, aes( y=expectedConfirmation, x=blockTime,group=refs, 
   theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
   xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
   geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.5) +
-  scale_color_manual(name="Number of Agents",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
+  scale_color_manual(name="Number of References",values=c('darkred','darkgreen','darkblue'), labels=c("3","4","2")) +
   scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime))))
+
+
+
+# Section Attachment Time of Folder
+
+
+# Section Get PenChart, Confirmation Chart % Penetration
+
+
+## Get ------------
+
+
+# Create List: row=chainNUm={blocks in that layer}
+
+
+# Check 10 layers if they 
+
+file_list = list.files(pattern="*.csv")
+penChart <- data.frame(matrix(ncol = 8 , nrow = length(file_list)))
+
+#data_list <- vector("list", "length" = length(file_list))
+#refData <- data.frame(matrix(ncol = 4, nrow = length(file_list)))
+#refData <- data.frame(matrix(ncol = 10 , nrow = length(file_list)))
+#colnames(refData) <- c("blockTime", "cTime", "orphanRate", "expectedConfirmation")
+colnames(penChart) <- c("blockTime", "numAgents","maps","dlt", "refs", "confirmationNumber", "consensus", "group")
+#######Time to confirm each TX:
+library(stringr)
+
+#loop through all files
+for (i in seq_along(file_list)) {
+  
+  #for (i in 1) {
+  
+  ##Step 1. Create Layer DataFrame
+  #txSubmissionTime = c()
+  filename = file_list[[i]]
+  print(paste(filename," ~ ",i/length(file_list)))
+  ## Read data in
+  df <- read.csv(filename, header = TRUE)
+  df = head(df,-500)
+  
+  layers = data.frame(matrix(ncol = 1, nrow = df$chainNum[nrow(df)]+10)) #dataframe made
+  colnames(layers)<-"layer"
+  ##Step 1.a, Fill Layer DataFrame
+  print("    Creating Layer Dataframe")
+  for (j in 2:nrow(df)){
+    #if (j%%1000==0)
+    #{
+     # print(j/nrow(df))
+    #}
+  chainNum =df[j,]$chainNum   #ChainNum
+    if (is.na(layers$layer[chainNum])){
+      layers$layer[chainNum]=list(df[j,]$ID)
+    }
+    else{
+      
+      layers$layer[chainNum][[1]] <- append(layers$layer[chainNum][[1]],  df[j,]$ID)
+    }
+  }
+  
+  
+  ##Step 2. Find Longest Chain for each block
+  #For 10 blocks,
+  print("    tFinding Penetration")
+  totPenetration=c()
+  #for each layer Row:
+  for(k in 1:(nrow(layers)-15)){
+    #if (k %% 400 == 0){
+      #print(k/(nrow(layers)-15))
+    #}
+    #print(paste("Layer:",k))
+    #currentLayer to reference easily
+    currentLayer2 = layers$layer[k][[1]]
+    
+    
+    for (currentLayer in currentLayer2){
+      penetration=c()
+      #go 10 rows in the future
+      for (kk in 1:15){
+        #print(paste( " Current layer",currentLayer))
+        nextLayer=c()
+        
+        #for each element in future list
+        for (kkk in layers$layer[k+kk][[1]]){
+        #print(paste(" Check this Block:",kkk))
+          tip = df$tips[kkk+1] #get tip
+          tip = str_sub(tip,2,-2) #remove '[]' 
+          tip = as.numeric(tip)
+          #print(paste("TIP: ",tip))
+            if (tip %in% currentLayer){
+            #add to penetration
+            penetration = append(penetration, kk)
+            #append to next Layer
+            nextLayer = append(nextLayer,kkk) 
+            #print(nextLayer)
+            #print(penetration)
+            
+            }
+          else{
+            next
+          }
+        }
+        currentLayer=nextLayer #increment currentLayer for next thingamabob
+        
+        
+      }
+      ##add penetration to totPenetration
+      penetration=unique(penetration)
+      totPenetration = append(totPenetration, penetration)
+    }
+    
+  }
+  
+  #plot and find confirmation number
+  h= hist(totPenetration, labels=TRUE, breaks=c(0:15))
+  
+  lastCount = h$counts[ length(h$counts)]
+  cutoff = lastCount/0.95
+
+  colors = h$counts>cutoff
+  numColors = sum(colors)
+  confirmationNumber = numColors
+  colors[1:numColors] = "gray"
+  colors[(numColors+1):length(colors)]="red"
+  hist(totPenetration, main=paste("Confirmation Number: ",confirmationNumber), labels=TRUE, breaks=c(0:15), col=colors)
+  
+  ##save data
+  penChart$blockTime[i] = as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][5])
+  penChart$numAgents[i] =   as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][3]) ##numAgents
+  penChart$maps[i] = strsplit(gsub("_", " ",filename), " +")[[1]][13]
+  penChart$dlt[i] =  strsplit(gsub("_", " ",filename), " +")[[1]][2]
+  penChart$refs[i] = as.numeric(substr(strsplit(gsub("_", " ",filename), " +")[[1]][17], 1, 1))
+  penChart$confirmationNumber[i] = confirmationNumber
+  penChart$consensus[i] = strsplit(gsub("_", " ",filename), " +")[[1]][3]
+  penChart$group[i] = as.numeric(substr(strsplit(gsub("_", " ",filename), " +")[[1]][19], 1, 1))
+  
+  
+  
+  
+  } 
+
+
+
