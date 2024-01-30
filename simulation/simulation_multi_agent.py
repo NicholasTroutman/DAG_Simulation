@@ -423,7 +423,7 @@ class Multi_Agent_Simulation:
 
 
     def cleanOldTxsAndBlocks(self, transaction):
-        lowerBound = 1500
+        lowerBound = 800
         if self.consensus == "near":
             lowerBound=2000
         if self.DLTMode == "hashgraph":
@@ -434,6 +434,7 @@ class Multi_Agent_Simulation:
             #print("CLEANING")
             ##remove old txs
             for agent in self.agents:
+                print(agent.id)
 
 
                 #remove old confirmed txs
@@ -444,8 +445,11 @@ class Multi_Agent_Simulation:
                     if currentTime - tx.arrival_time < lowerBound: ##MAGIC NUMBER
                         keepTxs.append(tx)
                         #numStayingTxs +=1
+                    else: #old tx, get rid of it
+                        agent.cuckooConfirmed.delete(str(tx)) #remove after clean up
 
                 agent._confirmed_transactions = keepTxs
+                print("Confirmed:\t",agent.cuckooConfirmed.__repr__())
 
                 ###Seed 1
                 ##No remove oldSubmitted Txs = 294.596
@@ -462,9 +466,13 @@ class Multi_Agent_Simulation:
                     #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
                     if currentTime - tx.arrival_time < lowerBound: ##MAGIC NUMBER
                         keepTxs.append(tx)
+                    else: #old tx, get rid of it
+                        agent.cuckooSubmitted.delete(str(tx)) #remove after clean up
                         #numStayingTxs +=1
-                agent._submitted_transactions = keepTxs
 
+                agent._submitted_transactions = keepTxs
+                print("Submitted:\t",agent.cuckooSubmitted.__repr__())
+                print("Visible:\t",agent.cuckooVisible.__repr__())
 
                 #remove old linked_blocks
                 keepBlocks=[]
@@ -475,6 +483,8 @@ class Multi_Agent_Simulation:
                 agent._linked_blocks = keepBlocks
 
                 keepBlocks=[]
+
+
                 #remove old visible blocks
                 #for block in agent.get_visible_blocks():
                     #print("\n",currentTime, " - ", block.id, ": ", block.creation_time)
