@@ -4,8 +4,8 @@ from simulation.block import BaseStationBlock #basestation block
 from itertools import chain
 
 class BaseStation(Node):
-    def __init__(self, _counter, _coordinates):
-        Node.__init__(self, _counter)
+    def __init__(self, _counter, _map, _coordinates):
+        Node.__init__(self, _counter, _map)
         self.coordinates = _coordinates
 
 
@@ -15,11 +15,11 @@ class BaseStation(Node):
         ##block variables
         #self._visible_transactions=[]
         #self.confirmed_transactions=[]
-        
+
         ##transaction variables
         #self._visible_blocks = []
         #self.confirmed_blocks = []
-        
+
         ##For analysis
         #self.agent_average_confirmation_confidence = 0
         #self.tips = []
@@ -57,15 +57,15 @@ class BaseStation(Node):
 
 
 	##Transaction functions
-    
+
     #def get_visible_transactions(self): #return vis txs
     #    return self._visible_transactions
-        
+
     #def add_visible_transactions(self, new_txs, time):  #no return
         #print("\nadd_vis_trans begin: ", time)
         #print("new: ",new_txs)
         #print("old: ",self._visible_transactions)
-        
+
      #   newest_txs = list(set(new_txs) - set(self._visible_transactions))
         #print("newest! :",newest_txs)
     #    for tx in newest_txs:
@@ -73,7 +73,7 @@ class BaseStation(Node):
     #        if tx.seen[self.id] == "":
     #            #print("\nUNSEEN: ", tx,"\n")
    #             tx.seen[self.id] = time
-   #             self._visible_transactions.append(tx) 
+   #             self._visible_transactions.append(tx)
                 #print("appended to vis_txs: ",self._visible_transactions)
 
 
@@ -82,7 +82,7 @@ class BaseStation(Node):
    # #print("\nadd_vis_trans begin: ", time)
     #print("new: ",new_blocks)
     #print("old: ",self._visible_transactions)
-    
+
       #  newest_blocks = list(set(new_blocks) - set(self._visible_blocks))
         #print("newest! :",newest_txs)
      #   for block in newest_blocks:
@@ -90,13 +90,13 @@ class BaseStation(Node):
      #       if block.seen[self.id] == "":
      #           #print("\nUNSEEN: ", block,"\n")
      #           block.seen[self.id] = time
-     #           self._visible_blocks.append(block) 
+     #           self._visible_blocks.append(block)
                 #print("appended to vis_txs: ",self._visible_blocks)
-    
+
     #def get_visible_blocks(self): #return vis blocks
       #  return self._visible_blocks
-        
-        
+
+
 
    # def __str__(self):
     #    return str(self.id)

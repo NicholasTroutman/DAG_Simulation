@@ -965,3 +965,35 @@ for (i in seq_along(file_list)) {
 
 
 
+
+
+
+
+
+
+# Section Storage ----------
+
+storage=test2
+
+#plot transactions
+library(ggplot2)
+#txs
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumTxs), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numTxs), color = "red") +
+  xlab('Time') +
+  ylab('Number'
+  )
+
+print(p)
+
+#blocks
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumTxs), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numTxs), color = "red") +
+  xlab('Time') +
+  ylab('Number'
+  )
+
+print(p)
+

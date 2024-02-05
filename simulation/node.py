@@ -45,9 +45,22 @@ class Node:
         self.tips = []
         self.record_tips = []
 
+        ##Variables to count number of Txs & Blocks
+        self.numTxs = 0
+        self.numBlocks = 0
+
+        self.maxNumTxs = 0
+        self.maxNumBlocks = 0
+        self.storageData = []
+
         ##Don't resubmit txs
         #self.resubmitTxs = []
 
+
+
+    #VOLUME FUNCTIONS (storage)
+    def recordVolume(self, time):
+        self.storageData.append([time, self.numTxs, self.numBlocks, self.maxNumTxs, self.maxNumBlocks])
 
 
     ##add functions
@@ -68,6 +81,8 @@ class Node:
             if tx.seen[self.id] == "":
                 #print("\nUNSEEN: ", tx,"\n")
                 tx.seen[self.id] = time
+                self.numTxs=self.numTxs+1
+                self.maxNumTxs=self.maxNumTxs+1
                 self._visible_transactions.append(tx) #only add if we've never seen before
                 change = True
         return change
@@ -85,7 +100,8 @@ class Node:
         for tx in newest_submitted_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = currentTime
-
+                self.numTxs=self.numTxs+1
+                self.maxNumTxs = self.maxNumTxs+1
             self._submitted_transactions.append(tx)
 
             if tx in self._visible_transactions: #remove submitted transaction from _visible_transcation list
@@ -110,6 +126,8 @@ class Node:
         for tx in newest_confirmed_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = time
+                self.numTxs=self.numTxs+1
+                self.maxNumTxs=self.maxNumTxs+1
             self._confirmed_transactions.append(tx)
 
 
@@ -134,6 +152,8 @@ class Node:
         for block in newest_blocks:
             #print(block,":  ",block.seen[self.id])
             if block.seen[self.id] == "":
+                self.numBlocks=self.numBlocks+1
+                self.maxNumBlocks=self.maxNumBlocks+1
                 #print("\nUNSEEN: ", block,"\n")
                 block.seen[self.id] = time
                 self._visible_blocks.append(block)
@@ -166,6 +186,8 @@ class Node:
             if block.seen[self.id] == "":
                 #print("\nUNSEEN: ", block,"\n")
                 block.seen[self.id] = time
+                self.numBlocks=self.numBlocks+1
+                self.maxNumBlocks=self.maxNumBlocks+1
                 self._linked_blocks.append(block)
                 #print("appended to confirmed_blocks: ",self._confirmed_blocks)
 

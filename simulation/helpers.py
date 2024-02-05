@@ -6,7 +6,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import math
-
+from simulation.mapMaker import Distance
 
 #create agent
 
@@ -17,10 +17,13 @@ def create_coordinates(agents, maxDistance,):
 
 #create random coordinates in [x,y] shape, of trafficImage
 def create_coordinates_nodes(agents, graph, tsp):
+    #print(graph)
     for agent in agents:
         begin, dest=np.random.choice(graph.nodes, size=2, replace=False)
-        #print(agent,": ",origin)
+        #print(agent,": ",begin)
+
         agent.coordinates = graph.nodes[begin]['pos']
+        #print(agent,": ",graph.nodes[begin]['pos'])
         agent.prev_dest = begin
         agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set
 
@@ -28,6 +31,102 @@ def create_coordinates_nodes(agents, graph, tsp):
 
         agent.vector=streetSlope/np.linalg.norm(streetSlope)
         #print(agent.vector)
+
+
+#create base stations based on k-means clustering
+def createBaseStations(numBaseStations, graph, reps):
+    #print("\nCreateBaseStations")
+    #print(len(graph.nodes))
+    if numBaseStations>(len(graph.nodes)/2):
+        sys.exit("Too Many BSUS, EXITING")
+
+    #print(graph)
+    bsus=[]
+    nodesUsed=[]
+    #initial starting points
+    for bs in range(0,numBaseStations):
+        loop=True
+        while(loop):
+            #print("\n\n",bsus)
+            begin, dest=np.random.choice(graph.nodes, size=2, replace=False)
+            #print(begin)
+            #print(graph.nodes)
+            #print(graph.nodes[node])
+            #print(graph.nodes[begin]['pos'])
+            coordinate=graph.nodes[begin]['pos']
+
+            #print("TESTING:")
+            #for b in bsus:
+                #print(b[1])
+
+            if begin not in nodesUsed:
+                nodesUsed.append(begin)
+                #[ID, current Coordinate, clustered nodes, average clustered Node]
+                bsus.append([bs,coordinate, [], [], [0,1]])
+                loop=False
+    #bsus  = [[id,coordinate]]
+    #print("Creation Done: ", bsus)
+
+    #k means time
+    for i in range(0,reps):
+        #print("\nRep: ",i)
+        #print(bsus)
+        #1. Classify all nodes
+        for n in graph.nodes:
+            #print("\n",n)
+            closest = 10000000
+            closestBS = -1
+            for bs in bsus:
+                #print(bs)
+                #print(bs[1])
+                coord= graph.nodes[n]['pos']
+                diff = Distance(coord,bs[1])
+                #print("DIFF: ",diff)
+                if diff<closest:
+                    closest=diff
+                    closestBS = bs[0]
+                    #print(closestBS)
+            bsus[closestBS][2].append(n)
+            bsus[closestBS][3].append(coord)
+
+        #2. Get mean of all nodes
+        for bs in bsus:
+            average = [sum(x)/len(x) for x in zip(*bs[3])]
+            bs[4] =average
+
+        #print("Mean Done:")
+        #for bs in bsus:
+            #print(bs)
+
+        #3. Assign mean of each cluster to closest node
+        for bs in bsus:
+            closest = 10000000
+            closestNode = -1
+            for n in bs[2]:
+                coord= graph.nodes[n]['pos']
+                diff = Distance(coord,bs[4])
+                if diff<closest:
+                    closest=diff
+                    closestNode = n
+            bs[1]=graph.nodes[closestNode]['pos']
+            #print(closest)
+        #for bs in bsus:
+            #print(bs)
+        #4. Remove classification
+        for bs in bsus:
+            bs[2]=[]
+            bs[3]=[]
+
+
+
+    print("\n\nBSUS:")
+    for bs in bsus:
+        print(bs)
+
+
+    #sys.exit("TESTING BEGONE")
+    return bsus
+
 
 
 def update_progress(progress, time):
@@ -290,4 +389,20 @@ def csv_export(self, file_name):
             for agentSeen in block.seen:
                 line.append(agentSeen)
                 #print("agentSeen:\t",agentSeen)
+            writer.writerow(line)
+
+
+def volume_export(self,file_name):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['time','numTxs','numBlocks','maxNumTxs','maxNumBlocks']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for line in self.agents[0].storageData:
             writer.writerow(line)

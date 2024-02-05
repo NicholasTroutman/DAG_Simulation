@@ -250,8 +250,12 @@ def print_coordinates(self, agents, time):
 
 ##NT: print_position of agents
 def print_coordinates_img(self, agents, time, backgroundImg):
+    #print("\nPRINT_COORDINATES_IMG: ",time)
 
-    colors = cm.rainbow(np.linspace(0, 1, len(agents)))
+    if self.basestations:
+        colors=cm.rainbow(np.linspace(0, 1, len(agents)+len(self.bsus)))
+    else:
+        colors = cm.rainbow(np.linspace(0, 1, len(agents)))
 
     ##NT: get agents coordinates into posx and posy
     posx=[]
@@ -294,6 +298,17 @@ def print_coordinates_img(self, agents, time, backgroundImg):
     for i in range(0,len(agents)):
         labels.append("Agent "+str(i+1))
 
+
+
+    if self.basestations:
+        for bs in self.bsus:
+            posx.append(bs.coordinates[0])
+            posy.append(bs.coordinates[1])
+            circle=plt.Circle((bs.coordinates[0],bs.coordinates[1]),agent.radius, color='black', fill=False)
+            ax.add_artist(circle)
+            labels.append("BSU "+str(bs.id))
+        #print(colors)
+        #sys.exit("PRINTING BSUS")
 
     #create scatterplot
     #for i in range(0,len(agents)): #check

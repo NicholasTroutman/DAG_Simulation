@@ -7,7 +7,7 @@ class Agent(Node):
     def __init__(self, counter, _map):
         Node.__init__(self, counter, _map)
         ##These variables are mobile agent specific
-        self.coordinates= [] #list of double x and y coordinates in double [x,y]
+        #self.coordinates= [] #list of double x and y coordinates in double [x,y]
         self.past_coordinates=[]
         self.destination=[]
         self.prev_dest=[]

@@ -13,10 +13,11 @@ import os
 
 
 from simulation.helpers import update_progress, create_distance_matrix, \
-common_elements, clamp, load_file, create_coordinates, create_coordinates_nodes, routes_export, routes_importer, confirmationLayer_importer
+common_elements, clamp, load_file, create_coordinates, create_coordinates_nodes, routes_export, routes_importer, confirmationLayer_importer, createBaseStations
 from simulation.mapMaker import Distance, DistanceToVector,  FindEdges, IdentfiyBlueEdgeIntersection,  LoadImageIntoGraph, isBetween #FindCenter
 from simulation.plotting import print_info, print_graph, print_graph_temp, print_coordinates, print_coordinates_img, print_tips_over_time, print_gif, print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, print_attachment_probabilities_alone,print_attachment_probabilities_all_agents
 from simulation.agent import Agent, DHTAgent
+from simulation.baseStation import BaseStation
 from simulation.transaction import Transaction,DHTTransaction
 from simulation.block import DAGBlock, LinearBlock, HashGraphBlock,  confirmBlocks, stronglySee, divideRounds, isFamous, orderRange, BFS
 
@@ -28,12 +29,17 @@ class Multi_Agent_Simulation:
                  _alpha, _distance, _tip_selection_algo, _latency = 1, \
                  _agent_choice = None, _printing = False, _lambda_m = 1/60,  \
                  _seed = 1, _DLTMode = "linear", _consensus = "individual",  \
-                 _importMap = "Error", _blockTime = 40, _references = 1, _group = 1):
+                 _importMap = "Error", _blockTime = 40, _references = 1, _group = 1, \
+                 _volume = 0, _basestations = 0):
 
         ##define variables
         self.consensus = _consensus #individual (PoW), near (PoS)
         #self.consensus_selection() ##assign self.create_block to either individual or near
-
+        self.basestations=_basestations
+        if self.basestations:
+            self.bsus=[]
+        #print("\nRSU?: ",self.basestations)
+        self.volume =_volume
         self.DLTMode = _DLTMode #dag, linear, dht, or hashgraph
         self.group = _group
         if self.DLTMode == "hashgraph":
@@ -158,6 +164,13 @@ class Multi_Agent_Simulation:
         #print(self.traffic)
         create_coordinates_nodes(self.agents, self.traffic, self.tsp)
 
+        #create BSU
+        if self.basestations==True:
+            tempBsus=createBaseStations(3,self.traffic, 5)
+            for bs in tempBsus:
+                #counter, map, coordinates ##map is used for radius lookup
+                self.bsus.append(BaseStation(bs[0],self.importMap,bs[1]))
+            print(self.bsus)
         #Create random arrival times Txs
         np.random.seed(self.seed)
         inter_arrival_times = np.random.exponential(1 / self.lam, self.no_of_transactions)
@@ -465,6 +478,8 @@ class Multi_Agent_Simulation:
                         #numStayingTxs +=1
                 agent._submitted_transactions = keepTxs
 
+                agent.numTxs = len(agent._submitted_transactions) + len(agent._visible_transactions) + len(agent._confirmed_transactions)
+
 
                 #remove old linked_blocks
                 keepBlocks=[]
@@ -474,7 +489,10 @@ class Multi_Agent_Simulation:
                 #agent._confirmed_blocks = keepBlocks
                 agent._linked_blocks = keepBlocks
 
-                keepBlocks=[]
+                agent.numBlocks = len(agent._visible_blocks) + len(agent._linked_blocks)
+
+
+                #keepBlocks=[]
                 #remove old visible blocks
                 #for block in agent.get_visible_blocks():
                     #print("\n",currentTime, " - ", block.id, ": ", block.creation_time)
@@ -676,6 +694,11 @@ class Multi_Agent_Simulation:
 
             update_progress(i/endTime, i)
             #prevTime=transaction.arrival_time ##old system whereby tx.arrival_time was increment
+
+            #print("??? ",self.volume)
+            if self.volume: #if storage/volume test
+                #pick agent 0
+                self.agents[0].recordVolume(i)
             prevTime=i #last second
 
             ##DEBUG NICK DELETE ME
@@ -691,6 +714,7 @@ class Multi_Agent_Simulation:
 
 
             ##save coordinates in frame for gif making later
+            #print(i,"\t",self.printing)
             if self.printing:
                 print_coordinates_img(self,self.agents, i , self.backgroundImg)
 
@@ -1702,3 +1726,11 @@ class Multi_Agent_Simulation:
         # print(attachment_probabilities_without_main)
         # print(attachment_probabilities_all)
         return attachment_probabilities_all
+
+
+
+    def getVolume(self):
+        for a in self.agents:
+            print("\nAgent: ",a)
+            print("\tTxs: ",a.numTxs)
+            print("\tBlocks: ",a.numBlocks)

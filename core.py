@@ -5,7 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import sys, getopt
 #from simulation.block import Block
-from simulation.helpers import update_progress, csv_export, create_random_graph_distances
+from simulation.helpers import update_progress, csv_export, create_random_graph_distances, volume_export
 from simulation.plotting import print_graph, print_tips_over_time, \
 print_tips_over_time_multiple_agents, print_tips_over_time_multiple_agents_with_tangle, \
 print_attachment_probabilities_alone, print_attachment_probabilities_all_agents
@@ -31,10 +31,12 @@ inputMap = "Houstonredblue"
 blockTime = 40
 references = 1
 group = 1
+volume =0
+basestations=0
 
 ##Commands --alpha/-a, --txs/-t, --netsize/-n, --lambda/-l
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group ="]
-opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbr:g:", commands)
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu ="]
+opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbrgv:r:", commands)
 for opt, arg in opts:
     print(opt," = ",arg)
     if opt in ('-a', '--alpha '):
@@ -52,6 +54,7 @@ for opt, arg in opts:
     elif opt in ('-p', '--printing '):
         #print("Lambda Found")
         p = str(arg).lower()
+        print("\t\tPRINTING TEST:\t",arg)
         if arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
             printing=False
         else:
@@ -90,6 +93,19 @@ for opt, arg in opts:
         group =int(arg)
         if group<2:
             sys.exit("Incorrect Group Size")
+    elif opt in ('v', '--volume '):
+        if arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
+            volume=False
+        else:
+            volume=True
+    elif opt in ('r', '--rsu '):
+        if arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
+            basestations=False
+        else:
+            basestations=True
+        #print("??", arg,"   ",bool(arg))
+        #print("Volume: ",volume)
+
 
 
 
@@ -105,7 +121,8 @@ print("Map: ",inputMap)
 print("BlockTime: ", blockTime)
 print("References: ",references)
 print("Group: ", group)
-
+print("Volume: ",volume)
+print("Road Side Unit: ",basestations)
 #sys.exit()
 #############################################################################
 # SIMULATION: SINGLE AGENT
@@ -144,6 +161,8 @@ my_lambda = [1]
 
 dir_name = './SimuData/'
 suffix = '.csv'
+
+
 for lam in my_lambda:
     timestr = time.strftime("%Y%m%d-%H%M")
     base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}' \
@@ -153,12 +172,19 @@ for lam in my_lambda:
                                 _distance = 1, _tip_selection_algo = tsa,
                                 _latency=1, _agent_choice=None,
                                 _printing=printing, _lambda_m=lam_m, _seed=seed,
-                                 _DLTMode=DLTMode, _consensus=consensus, _importMap=inputMap, _blockTime=blockTime, _references=references, _group=group)
+                                 _DLTMode=DLTMode, _consensus=consensus, _importMap=inputMap, _blockTime=blockTime,
+                                  _references=references, _group=group, _volume = volume, _basestations = basestations)
     simu2.setup()
     simu2.run()
-    file_name = os.path.join(dir_name, base_name + suffix)
-    csv_export(simu2, file_name)
-
+    if volume == 0: ##ETC run
+        file_name = os.path.join(dir_name, base_name + suffix)
+        csv_export(simu2, file_name)
+    else: #volume test
+        print("\nTODO: Storage\n")
+        #simu2.getVolume() ##gets data from everyone
+        file_name = os.path.join(dir_name, base_name + "_VOLUME" + suffix)
+        volume_export(simu2, file_name)
+        #print(simu2.agents[0].storageData)
 print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")
 
 #############################################################################
