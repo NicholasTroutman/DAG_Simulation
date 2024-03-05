@@ -37,6 +37,31 @@ def create_coordinates_nodes(agents, graph, tsp):
 def createBaseStations(numBaseStations, graph, reps):
     #print("\nCreateBaseStations")
     #print(len(graph.nodes))
+
+    attempts=0
+    while True:
+        bsus = createBaseStationsRandomizer(numBaseStations,graph,reps)
+        #print("\n\nBSUS:")
+        classSize=[]
+        for bs in bsus:
+            #print(bs)
+            #print(len(bs[2]))
+            classSize.append(len(bs[2]))
+
+        #print("classSize: ",classSize)
+        #print("Minimum Cutoff:\t",((len(graph.nodes)/(numBaseStations))*2/3))
+        if min(classSize)<((len(graph.nodes)/(numBaseStations))*2/3):
+            attempts=attempts+1
+            print("BAD BSU PLACEMENT:\t",attempts)
+        else:
+            return bsus
+
+    #sys.exit("TESTING BEGONE")
+    return bsus
+
+def createBaseStationsRandomizer(numBaseStations, graph, reps):
+    #print("\nCreateBaseStations")
+    #print(len(graph.nodes))
     if numBaseStations>(len(graph.nodes)/2):
         sys.exit("Too Many BSUS, EXITING")
 
@@ -71,6 +96,10 @@ def createBaseStations(numBaseStations, graph, reps):
     for i in range(0,reps):
         #print("\nRep: ",i)
         #print(bsus)
+        #0. get rid of useless data]
+        for bs in bsus:
+            bs[2]=[]
+            bs[3]=[]
         #1. Classify all nodes
         for n in graph.nodes:
             #print("\n",n)
@@ -113,16 +142,6 @@ def createBaseStations(numBaseStations, graph, reps):
         #for bs in bsus:
             #print(bs)
         #4. Remove classification
-        for bs in bsus:
-            bs[2]=[]
-            bs[3]=[]
-
-
-
-    print("\n\nBSUS:")
-    for bs in bsus:
-        print(bs)
-
 
     #sys.exit("TESTING BEGONE")
     return bsus
@@ -302,6 +321,8 @@ def confirmationLayer_importer(simulation, file_name):
        reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
        #data_list = list(reader)
 
+       #print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap, " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ", simulation.group)
+      # print("\n\n")
        for row in reader:
            blockTime = row['blockTime']
            numAgents = row['numAgents']
@@ -310,8 +331,10 @@ def confirmationLayer_importer(simulation, file_name):
            refs = row['refs']
            consensus = row['consensus']
            group = row['group']
-           #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
            #if consensus==simulation.consensus:
+               #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #print((numAgents))
+               #print(int(numAgents)==int(simulation.no_of_agents))
                #if int(simulation.no_of_agents) == int(numAgents):
                    #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
                    #print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap[:-4], " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ",simulation.group)
@@ -330,6 +353,40 @@ def confirmationLayer_importer(simulation, file_name):
            print("DHT/Hashgraph no Confirmation Needed")
            return int(3)
        #sys.exit("No Confirmation Layer Found, RECOMPUTE")
+       ##linear check for 2 References
+
+    with open(file_name, 'r') as file:
+       reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+
+       if simulation.DLTMode=="linear": #check for 1
+           print("Recheck for ref=2 because Linear")
+           for row in reader:
+               blockTime = row['blockTime']
+               numAgents = row['numAgents']
+               map = row['map']
+               dlt = row['dlt']
+               refs = row['refs']
+               consensus = row['consensus']
+               group = row['group']
+               # print(consensus)
+               # if consensus==simulation.consensus:
+               #     print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #     print((numAgents))
+               #     print(int(numAgents)==int(simulation.no_of_agents))
+               #     if int(simulation.no_of_agents) == int(numAgents):
+               #         print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #         print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap[:-4], " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ",simulation.group)
+
+
+
+               if (int(simulation.blockTime) == int(blockTime) and int(simulation.no_of_agents) == int(numAgents) and simulation.importMap[:-4] == map):
+
+                   if (simulation.DLTMode == dlt and int(2) == int(refs)):
+
+                       if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                           return int(row['confirmationNumber'])
+
+
        print("NO CONFIRMATION LAYER FOUND, USE THESE RESULTS FOR COMPUTING CONFIRMATION LAYER")
        return int(3)
 
@@ -345,11 +402,24 @@ def csv_export(self, file_name):
             header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
-        for transaction in self.DG.nodes:
-            #print("seenList: ",transaction.seen)
-            for agentId, agentSeen in enumerate(transaction.seen):
-                header.append(str("agent_"+str(agentId+1)))
-            break
+
+        #add header for agentSeen
+        for i in range(0,self.no_of_agents):
+            header.append(str("agent_"+str(i+1)))
+
+        #add headers for RSUseen
+        for i in range(0,self.basestations):
+            header.append(str("basestation_"+str(i+1)))
+
+
+        # for transaction in self.DG.nodes:
+        #     #print("seenList: ",transaction.seen)
+        #     for agentId, agentSeen in enumerate(transaction.seen):
+        #         header.append(str("agent_"+str(agentId+1)))
+        #     break
+
+
+
         #print(header)
         writer.writerow(header) #add confirmation time +
         #Write genesis
@@ -396,7 +466,7 @@ def volume_export(self,file_name):
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
-        headers = ['time','numTxs','numBlocks','maxNumTxs','maxNumBlocks']
+        headers = ['time','numTxs','numBlocks','maxNumTxs','maxNumBlocks','blockTxs']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
 

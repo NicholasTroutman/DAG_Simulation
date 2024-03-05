@@ -1,12 +1,31 @@
 from collections import defaultdict
 import hashlib
 
+
+class LightTransaction:
+    def __init__(self, _time, _numInputs, _inputs, _numOutputs, _outputs): #initialize with numAgents for seen variable
+            self.time = _time #uint32 bits,
+            self.numInputs = _numInputs #4
+            self.inputs = _inputs #16bits * 3
+            self.numOutputs = _numOutputs #4
+            self.outputs= _outputs #16bits * 3
+
+
+class LightInput:
+    def __init__(self, hash, index):
+        self.hash=hash #256 bits, 32 bytes
+        self.index=index #4 bits uint4
+
+class LightOutput:
+    def __init__(self, value):
+        self.value=value #uint16, 16 bits
+
 class Transaction:
-    def __init__(self, _arrival_time, _counter, _numAgents): #initialize with numAgents for seen variable
+    def __init__(self, _arrival_time, _counter, _numAgents, _numRSU=0): #initialize with numAgents for seen variable
             self.arrival_time = _arrival_time
             self.id = _counter
             self.agent = None
-            self.seen=[""]*_numAgents#list where index=agent and value=time seen, for latency statistics
+            self.seen=[""]*(_numAgents+_numRSU)#list where index=agent and value=time seen, for latency statistics
             #self.assignedValidator = -1
             #For tip selection and calculating confirmation_confidence
             #self.cum_weight = 1

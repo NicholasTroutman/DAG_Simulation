@@ -2,6 +2,7 @@ import traceback
 from simulation.block import DAGBlock, LinearBlock
 import sys
 
+
 #Node is a base class that mobile agents and immobile base stations inherit common functions from
 class Node:
     def __init__(self, _counter, _map):
@@ -35,11 +36,14 @@ class Node:
         self._visible_transactions=[]
         self._submitted_transactions = []
         self._confirmed_transactions=[]
+        self._pruned_transactions=[]
 
         #block variables
         self._visible_blocks = []
         #self._confirmed_blocks = []
         self._linked_blocks = []
+        self._pruned_blocks = []
+
         #For analysis
         self.agent_average_confirmation_confidence = 0
         self.tips = []
@@ -48,6 +52,7 @@ class Node:
         ##Variables to count number of Txs & Blocks
         self.numTxs = 0
         self.numBlocks = 0
+        self.blockTxs = 0 #how many txs/block
 
         self.maxNumTxs = 0
         self.maxNumBlocks = 0
@@ -60,7 +65,7 @@ class Node:
 
     #VOLUME FUNCTIONS (storage)
     def recordVolume(self, time):
-        self.storageData.append([time, self.numTxs, self.numBlocks, self.maxNumTxs, self.maxNumBlocks])
+        self.storageData.append([time, self.numTxs, self.numBlocks, self.maxNumTxs, self.maxNumBlocks, self.blockTxs])
 
 
     ##add functions
@@ -81,10 +86,13 @@ class Node:
             if tx.seen[self.id] == "":
                 #print("\nUNSEEN: ", tx,"\n")
                 tx.seen[self.id] = time
-                self.numTxs=self.numTxs+1
-                self.maxNumTxs=self.maxNumTxs+1
+                #self.numTxs=self.numTxs+1
+                #self.maxNumTxs=self.maxNumTxs+1
                 self._visible_transactions.append(tx) #only add if we've never seen before
                 change = True
+
+        self.numTxs = len(self._visible_transactions)
+        self.maxNumTxs = max(self.maxNumTxs, self.numTxs)
         return change
 
 
@@ -100,13 +108,15 @@ class Node:
         for tx in newest_submitted_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = currentTime
-                self.numTxs=self.numTxs+1
-                self.maxNumTxs = self.maxNumTxs+1
+                #self.numTxs=self.numTxs+1
+                #self.maxNumTxs = self.maxNumTxs+1
             self._submitted_transactions.append(tx)
 
-            if tx in self._visible_transactions: #remove submitted transaction from _visible_transcation list
+            if tx in self._visible_transactions: #remove submitted transaction from _visible_transactions list
                 self._visible_transactions.remove(tx)
                 #print(self.id," removing from _visible_transcation:\t", tx)
+        self.numTxs = len(self._visible_transactions)
+        self.maxNumTxs = max(self.maxNumTxs, self.numTxs)
 
 
 
@@ -120,37 +130,33 @@ class Node:
 
         newest_confirmed_txs = list(set(new_confirmed_txs) - set(self._confirmed_transactions))
 
-
-
-
         for tx in newest_confirmed_txs:
             if tx.seen[self.id] == "": #if unseen
                 tx.seen[self.id] = time
-                self.numTxs=self.numTxs+1
-                self.maxNumTxs=self.maxNumTxs+1
+                #self.numTxs=self.numTxs+1
+                #self.maxNumTxs=self.maxNumTxs+1
             self._confirmed_transactions.append(tx)
 
+        self._visible_transactions = list(set(self._visible_transactions) - set(newest_confirmed_txs))
+            #if tx in self._visible_transactions: #remove confirmed transaction from _visible_transcation list
+            #    self._visible_transactions.remove(tx)
 
-            if tx in self._visible_transactions: #remove confirmed transaction from _visible_transcation list
-                self._visible_transactions.remove(tx)
+        self._submitted_transactions = list(set(self._submitted_transactions) - set(newest_confirmed_txs))
+            #if tx in self._submitted_transactions: #remove confirmed transaction from _visible_transcation list
+            #    self._submitted_transactions.remove(tx)
 
-            if tx in self._submitted_transactions: #remove confirmed transaction from _visible_transcation list
-                self._submitted_transactions.remove(tx)
-
+        self.numTxs = len(self._visible_transactions)
+        self.maxNumTxs = max(self.maxNumTxs, self.numTxs)
 
 
     ##Block functions
     def add_visible_blocks(self, new_blocks, time): #no return
-        #print("\nadd_vis_trans begin: ", time)
-        #print("new: ",new_blocks)
-        #print("old: ",self._visible_blocks)
-
         changeMade = False
 
         newest_blocks = list(set(new_blocks) - set(self._visible_blocks))
         #print("newest! :",newest_blocks)
         for block in newest_blocks:
-            #print(block,":  ",block.seen[self.id])
+
             if block.seen[self.id] == "":
                 self.numBlocks=self.numBlocks+1
                 self.maxNumBlocks=self.maxNumBlocks+1
@@ -168,16 +174,15 @@ class Node:
             if isinstance(block, (DAGBlock, LinearBlock)):
                 self.confirmTxs(block.confirmedBlocks, time)
 
+
+        self.blockTxs = sum(b.numTxs for b in self._visible_blocks) +  sum(b.numTxs for b in self._linked_blocks)
+
         return changeMade
 
 
 
     #def add_confirmed_blocks(self, new_blocks, time): #no return
     def add_linked_blocks(self, new_blocks, time): #no return
-        #print("\nadd_confirm_block begin: ", time)
-        #print("new: ",new_blocks)
-        #print("old: ",self._confirmed_blocks)
-
         #newest_blocks = list(set(new_blocks) - set(self._confirmed_blocks))
         newest_blocks = list(set(new_blocks) - set(self._linked_blocks))
         #print("newest! :",newest_blocks)
@@ -200,9 +205,18 @@ class Node:
             if isinstance(block, (DAGBlock, LinearBlock)):
                 self.confirmTxs(block.confirmedBlocks, time)
 
+        self.blockTxs = sum(b.numTxs for b in self._visible_blocks) +  sum(b.numTxs for b in self._linked_blocks)
+
+
+
+
+
     def confirm_all_vis_blocks(self, time):
         self._linked_blocks = self._linked_blocks + self._visible_blocks
         self._visible_blocks = [] #empty it out
+
+
+
 
 #Confirm TXS
 

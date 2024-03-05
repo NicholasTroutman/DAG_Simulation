@@ -33,10 +33,13 @@ references = 1
 group = 1
 volume =0
 basestations=0
+pruning=0
+balance= 0
+maxTxs=200
+minTxs=0
 
-##Commands --alpha/-a, --txs/-t, --netsize/-n, --lambda/-l
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu ="]
-opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbrgv:r:", commands)
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu =", "pruning =", "balance =", "maxTxs =", "minTxs ="]
+opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbrgvrpbm:m:", commands)
 for opt, arg in opts:
     print(opt," = ",arg)
     if opt in ('-a', '--alpha '):
@@ -99,14 +102,30 @@ for opt, arg in opts:
         else:
             volume=True
     elif opt in ('r', '--rsu '):
-        if arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
-            basestations=False
+        if int(arg)<0:
+            sys.exit("BaseStation NEGATIVE, ERROR")
         else:
-            basestations=True
-        #print("??", arg,"   ",bool(arg))
-        #print("Volume: ",volume)
-
-
+            basestations=int(arg)
+    elif opt in ('p', '--pruning '):
+        if  arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
+            pruning=0
+        else:
+            pruning=1
+    elif opt in ('b', '--balance '):
+        if  arg=="0" or arg=="False" or arg=="FALSE" or arg=="false":
+            balance=0
+        else:
+            balance=1
+    elif opt in ('-m', '--maxTxs '):
+        if int(arg)>0:
+            maxTxs=int(arg)
+        else:
+            sys.exit("maxTxs INVALID")
+    elif opt in ('-m', '--minTxs '):
+        if int(arg)>0:
+            minTxs=int(arg)
+        else:
+            sys.exit("minTxs INVALID")
 
 
 #print("\nAlpha: ", alpha)
@@ -123,6 +142,10 @@ print("References: ",references)
 print("Group: ", group)
 print("Volume: ",volume)
 print("Road Side Unit: ",basestations)
+print("Pruning: ",pruning)
+print("Balance: ",balance)
+print("MaxTxs: ",maxTxs)
+print("MinTxs: ",minTxs)
 #sys.exit()
 #############################################################################
 # SIMULATION: SINGLE AGENT
@@ -165,22 +188,24 @@ suffix = '.csv'
 
 for lam in my_lambda:
     timestr = time.strftime("%Y%m%d-%H%M")
-    base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}' \
-                .format(timestr, DLTMode, consensus, txs, tsa, netsize, seed, inputMap, blockTime, references, group)
+    base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_maxTxs_{}' \
+                .format(timestr, DLTMode, consensus, txs, tsa, netsize, seed, inputMap, blockTime, references, group, basestations, pruning, balance, maxTxs)
     simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                                 _no_of_agents = netsize, _alpha = alpha,
                                 _distance = 1, _tip_selection_algo = tsa,
                                 _latency=1, _agent_choice=None,
                                 _printing=printing, _lambda_m=lam_m, _seed=seed,
                                  _DLTMode=DLTMode, _consensus=consensus, _importMap=inputMap, _blockTime=blockTime,
-                                  _references=references, _group=group, _volume = volume, _basestations = basestations)
+                                  _references=references, _group=group, _volume = volume, _basestations = basestations, _pruning = pruning, _balance=balance, _maxTxs=maxTxs)
     simu2.setup()
     simu2.run()
     if volume == 0: ##ETC run
         file_name = os.path.join(dir_name, base_name + suffix)
         csv_export(simu2, file_name)
     else: #volume test
-        print("\nTODO: Storage\n")
+        #print("\nTODO: Storage\n")
+        file_name = os.path.join(dir_name, base_name + suffix)
+        csv_export(simu2, file_name)
         #simu2.getVolume() ##gets data from everyone
         file_name = os.path.join(dir_name, base_name + "_VOLUME" + suffix)
         volume_export(simu2, file_name)

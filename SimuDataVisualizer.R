@@ -8,7 +8,7 @@ library(reshape2)
 
 
 ##upload csv as simuData
-simuData=testtest
+simuData=d50
 #simuData=dhtTest
 
 
@@ -115,7 +115,7 @@ plot(blockTimeList$BlockTime,1-blockTimeList$ConfirmationPercentage, main="Block
 # Section Time to confirm each TX (1 data frame) ---------
 txConfirmationTime =  c()
 ##add to listblockConfirmationTime-txCreationTime
-confirmedBlocks = simuData[simuData$confirmedBlock=="True",]
+confirmedBlocks = simuData[simuData$confirmedBlock=="TRUE",]
 for (i in 2:nrow(confirmedBlocks)){
   #print(confirmedBlocks$ID[i])
   tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[i], ",")[[1]] #returns 1, 2 3
@@ -129,13 +129,18 @@ for (i in 2:nrow(confirmedBlocks)){
   } 
 }
 
-h<-hist(txConfirmationTime, breaks=40)
 
-
+#plot h50
+#h<-hist(txConfirmationTime, breaks=100, main="50 tx/Block")
+plot(h50)
 d <- density(txConfirmationTime, na.rm=TRUE)
-lines(x=d$x,y=d$y*length(txConfirmationTime)*(h$breaks[2] - h$breaks[1]))
+lines(x=d$x,y=d$y*length(txConfirmationTime)*(h50$breaks[2] - h$breaks[1]), col="blue", lwd=2)
 
-
+##plot h200
+#h<-hist(txConfirmationTime, breaks=100, main="50 tx/Block")
+plot(h50)
+d <- density(txConfirmationTime, na.rm=TRUE)
+lines(x=d$x,y=d$y*length(txConfirmationTime)*(h$breaks[2] - h$breaks[1]), col="blue", lwd=2)
 
 
 
@@ -522,7 +527,7 @@ for (i in seq_along(file_list)) {
   
   
   ##save data
-  refData$blockTime[i] = as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][5])
+  #refData$blockTime[i] = as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][5])
   refData$cTime[i] = list(na.omit(txConfirmationTime))
   refData$orphanRate[i] = 1-((nrow(confirmedBlocks)+1)/nrow(df))
   refData$numAgents[i] =   as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][3]) ##numAgents
@@ -861,7 +866,7 @@ for (i in seq_along(file_list)) {
   print(paste(filename," ~ ",i/length(file_list)))
   ## Read data in
   df <- read.csv(filename, header = TRUE)
-  df = head(df,-500)
+  df = head(df,-25)
   
   layers = data.frame(matrix(ncol = 1, nrow = df$chainNum[nrow(df)]+10)) #dataframe made
   colnames(layers)<-"layer"
@@ -973,7 +978,36 @@ for (i in seq_along(file_list)) {
 
 # Section Storage ----------
 
-storage=test2
+
+storage=v50
+storage=v150
+#plot transactions
+library(ggplot2)
+#txs
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumTxs), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numTxs), color = "red") +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle("100 Tx Storage") + 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+  
+
+print(p)
+
+#blocks
+
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumBlocks), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numBlocks), color = "red") +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle('100 Block Storage')
+  
+
+print(p)
+
+storage=d500
 
 #plot transactions
 library(ggplot2)
@@ -982,18 +1016,639 @@ p = ggplot() +
   geom_line(data = storage, aes(x = time, y = maxNumTxs), color = "blue") +
   geom_line(data = storage, aes(x = time, y = numTxs), color = "red") +
   xlab('Time') +
-  ylab('Number'
-  )
+  ylab('Number') + 
+  ggtitle("500 Tx Storage") + 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+
 
 print(p)
 
 #blocks
+
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumBlocks), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numBlocks), color = "red") +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle('500 Block Storage')
+
+
+print(p)
+
+
+
+##100
+storage=d1000
+
 p = ggplot() + 
   geom_line(data = storage, aes(x = time, y = maxNumTxs), color = "blue") +
   geom_line(data = storage, aes(x = time, y = numTxs), color = "red") +
   xlab('Time') +
-  ylab('Number'
-  )
+  ylab('Number') + 
+  ggtitle("1000 Tx Storage") + 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
 
+
+print(p)
+
+#blocks
+
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumBlocks), color = "blue") +
+  geom_line(data = storage, aes(x = time, y = numBlocks), color = "red") +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle('1000 Block Storage')
+
+
+print(p)
+
+storage=d2000
+
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumTxs, color = "Seen")) +
+  geom_line(data = storage, aes(x = time, y = numTxs, color = "Currently Stored")) +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle("2000 Keep Time ~ Tx Storage") + 
+  labs(colour="Txs:")+
+  scale_color_manual(values=c("red", "blue"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+print(p)
+
+#blocks
+p = ggplot() + 
+  geom_line(data = storage, aes(x = time, y = maxNumBlocks, color = "Seen")) +
+  geom_line(data = storage, aes(x = time, y = numBlocks, color = "Currently Stored")) +
+  xlab('Time') +
+  ylab('Number') +
+  labs(colour="Blocks:")+
+  scale_color_manual(values=c("red", "blue"))+
+  ggtitle('2000 Keep Time ~ Block Storage')
+print(p)
+
+
+##COMPARISON
+p = ggplot() + 
+  geom_line(data = d50, aes(x = time, y = numBlocks, color = "50")) +
+  #geom_line(data = d100, aes(x = time, y = numTxs, color = factor(100))) +
+  geom_line(data = d500, aes(x = time, y = numBlocks, color = "500")) +
+  geom_line(data = d1000, aes(x = time, y = numBlocks, color = "1000")) +
+  geom_line(data = d2000, aes(x = time, y = numBlocks, color = "2000")) + 
+  xlab('Time') +
+  ylab('Number') + 
+  scale_colour_manual(values = c( "blue", "black", "red", "green")) +#scale_color_gradientn(colors=c('red','black','blue')) +
+  scale_fill_discrete(breaks=c("50","500", "1000", "2000")) +
+  labs(colour="Keep Time")+
+  theme(legend.position = c(0, 1),legend.justification = c(-0.15, 1.1))+
+  ggtitle('Block Storage Comparison')
+print(p)
+
+p = ggplot() + 
+  geom_line(data = d50, aes(x = time, y = numTxs, color = "50")) +
+  #geom_line(data = d100, aes(x = time, y = numTxs, color = factor(100))) +
+  geom_line(data = d500, aes(x = time, y = numTxs, color = "500")) +
+  geom_line(data = d1000, aes(x = time, y = numTxs, color = "1000")) +
+  geom_line(data = d2000, aes(x = time, y = numTxs, color = "2000")) + 
+  xlab('Time') +
+  ylab('Number') + 
+  scale_colour_manual(values = c( "blue", "black", "red", "green")) +#scale_color_gradientn(colors=c('red','black','blue')) +
+  scale_fill_discrete(breaks=c("50","500", "1000", "2000")) +
+  labs(colour="Keep Time")+
+  theme(legend.position = c(0, 1),legend.justification = c(-0.15, 1.1))+
+  ggtitle('TX Storage Comparison')
+print(p)
+
+
+p = ggplot() + 
+  geom_line(data = d10, aes(x = time, y = numTxs), color = "red") +
+  geom_line(data = d50, aes(x = time, y = numTxs), color = "black") +
+  geom_line(data = d100, aes(x = time, y = numTxs), color = "blue") +
+  xlab('Time') +
+  ylab('Number') + 
+  ggtitle('TX Storage Comparison')
+print(p)
+
+
+
+##COMPARISON OF DIFFERENT BaseStation #'s
+r3d1000=d1000
+#r10d1000
+#r6d1000
+#r1d1000
+
+p = ggplot() + 
+  geom_line(data = r1d1000,  aes(x = time, y = numTxs, color = "1")) +
+  geom_line(data = r3d1000,  aes(x = time, y = numTxs, color = "3")) +
+  geom_line(data = r6d1000,  aes(x = time, y = numTxs, color = "6")) +
+  geom_line(data = r10d1000, aes(x = time, y = numTxs, color = "10")) +
+  xlab('Time') +
+  ylab('Number of Stored Txs') + 
+  ggtitle("1000 Keep Time ~ Varying Base Station #'s") + 
+  labs(colour="# of Base Stations:")+
+  scale_color_manual(values=c("red", "blue", "green","black"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+print(p)
+
+p = ggplot() + 
+  geom_line(data = r1d1000,  aes(x = time, y = numBlocks, color = "1")) +
+  geom_line(data = r3d1000,  aes(x = time, y = numBlocks, color = "3")) +
+  geom_line(data = r6d1000,  aes(x = time, y = numBlocks, color = "6")) +
+  geom_line(data = r10d1000, aes(x = time, y = numBlocks, color = "10")) +
+  xlab('Time') +
+  ylab('Number of Stored Blocks') + 
+  ggtitle("1000 Keep Time ~ Varying Base Station #'s") + 
+  labs(colour="# of Base Stations:")+
+  scale_color_manual(values=c("red", "blue", "green","black"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+print(p)
+
+
+
+
+
+
+###PRUNING TEST
+data=prune10
+
+data=prune30
+p = ggplot() + 
+  geom_line(data = prune10,  aes(x = time, y = numTxs, color = "10")) +
+  geom_line(data = prune30,  aes(x = time, y = numTxs, color = "30")) +
+  xlab('Time') +
+  ylab('Number of Stored Txs') + 
+  ggtitle("Pruning, Varying Size") + 
+  labs(colour="# of Agents:")+
+  scale_color_manual(values=c("red", "blue", "green","black"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+print(p)
+
+p = ggplot() + 
+  geom_line(data = prune10,  aes(x = time, y = numBlocks, color = "10")) +
+  geom_line(data = prune30,  aes(x = time, y = numBlocks, color = "30")) +
+  xlab('Time') +
+  ylab('Number of Stored Blocks') + 
+  ggtitle("Pruning, Varying Size") + 
+  labs(colour="# of Agents:")+
+  scale_color_manual(values=c("red", "blue", "green","black"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.4))
+print(p)
+
+
+
+
+
+
+
+###STORAGE NUMBER:
+##BLOCK HEADER: 240
+##TX Size: 196 (with 3 inputs/outputs)
+library(ggplot2)
+#blockSize=8+32+32+32+8+256*2
+blockSize=8+32+32+32+8+192*2
+#txSize = (32+4+3*36)+  (4*16) + (256) #tx data + tag
+txSize = (32+4+3*36)+  (4*16) + (192) #tx data + tag #truncate to 192 bits, or 24 bytes
+
+
+data50=v50
+data70=v70
+data100=v100
+data150=v150
+
+#Preprocessing
+data50$blockStorage=data50$numBlocks*blockSize
+data50$txStorage=data50$numTxs*txSize
+data50$blockTxStorage=data50$blockTxs*txSize
+#Preprocessing
+data70$blockStorage=data70$numBlocks*blockSize
+data70$txStorage=data70$numTxs*txSize
+data70$blockTxStorage=data70$blockTxs*txSize
+#Preprocessing
+data100$blockStorage=data100$numBlocks*blockSize
+data100$txStorage=data100$numTxs*txSize
+data100$blockTxStorage=data100$blockTxs*txSize
+#Preprocessing
+data150$blockStorage=data150$numBlocks*blockSize
+data150$txStorage=data150$numTxs*txSize
+data150$blockTxStorage=data150$blockTxs*txSize
+#Preprocessing
+data200$blockStorage=data200$numBlocks*blockSize
+data200$txStorage=data200$numTxs*txSize
+data200$blockTxStorage=data200$blockTxs*txSize
+
+
+
+##total storage in kilobytes
+p = ggplot() + 
+  geom_line(data = data50,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "50")) +
+  geom_line(data = data70,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "70")) +
+  geom_line(data = data100,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "100")) +
+  geom_line(data = data150,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "150")) +
+  #geom_line(data = data200,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "200")) +
+  xlab('Time') +
+  ylab('Storage in KiloBytes') + 
+  ggtitle("Total Storage w/ Different Block Tx Limts") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","maroon","red", "blue", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+##COMPARE 2
+##total storage in kilobytes
+p = ggplot() + 
+  geom_line(data = X25v100,  aes(x = time, y = (blockTxStorage+blockStorage)+txStorage, color = "25Block")) +
+  geom_line(data = X50v100,  aes(x = time, y = (blockTxStorage+blockStorage)+txStorage, color = "50Block")) +
+  geom_line(data = X25v100,  aes(x = time, y = txStorage, color = "25Tx")) +
+  geom_line(data = X50v100,  aes(x = time, y = txStorage, color = "50Tx")) +
+  #geom_line(data = data200,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "200")) +
+  xlab('Time') +
+  ylab('Storage in KiloBytes') + 
+  ggtitle("Total Storage w/ Different Block Tx Limts") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red", "blue", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+p = ggplot() + 
+  geom_line(data = X25v100,  aes(x = time, y = numBlocks, color = "25Block")) +
+  geom_line(data = X50v100,  aes(x = time, y = numBlocks, color = "50Block")) +
+  
+  #geom_line(data = X25v100,  aes(x = time, y = numTxs, color = "25Tx")) +
+  #geom_line(data = X50v100,  aes(x = time, y = numTxs, color = "50Tx")) +
+  
+  #geom_line(data = X25v100,  aes(x = time, y = blockTxs, color = "25Tx")) +
+  #geom_line(data = X50v100,  aes(x = time, y = blockTxs, color = "50Tx")) +
+  
+  
+  #geom_line(data = data200,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125+txStorage*0.000125, color = "200")) +
+  xlab('Time') +
+  ylab('Number (frequency)') + 
+  ggtitle("Total Storage w/ Different Block Tx Limts") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+
+#block storage in kB
+p = ggplot() + 
+  #geom_line(data = X30v100,  aes(x = time, y = numBlocks, color = "30Block")) +
+  #geom_line(data = X45V100,  aes(x = time, y = numBlocks, color = "45Block")) +
+  #geom_line(data = X130v100,  aes(x = time, y = numBlocks, color = "130Block")) +
+  geom_line(data = X30v100,  aes(x = time, y = numTxs, color = "30Tx")) +
+  geom_line(data = X45V100,  aes(x = time, y = numTxs, color = "45Tx")) +
+  geom_line(data = X130v100,  aes(x = time, y = numTxs, color = "130Tx")) +
+  #geom_line(data = X130v100,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125, color = "130Block")) 
+  #geom_line(data = X30v100,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125, color = "30Block")) +
+  #geom_line(data = X130v100,  aes(x = time, y = (blockTxStorage+blockStorage)*0.000125, color = "130Block")) +
+  #geom_line(data = X30v100,  aes(x = time, y = (txStorage)*0.000125, color = "30Tx")) +
+  #geom_line(data = X130v100,  aes(x = time, y = (txStorage)*0.000125, color = "130Tx")) +
+  xlab('Time') +
+  ylab('Storage in KiloBytes') + 
+  ggtitle("Block Storage w/ Different Block Tx Limits") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red","blue"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+#tx pool storage in  kb
+p = ggplot() + 
+  #geom_line(data = data50,  aes(x = time, y = txStorage*0.000125, color = "50")) +
+  #geom_line(data = data100,  aes(x = time, y = txStorage*0.000125, color = "100")) +
+ # geom_line(data = data150,  aes(x = time, y =txStorage*0.000125, color = "150")) +
+ # geom_line(data = data200,  aes(x = time, y = txStorage*0.000125, color = "200")) +
+  xlab('Time') +
+  ylab('Storage in KiloBytes') + 
+  ggtitle("Tx Pool Storage w/ Different Block Tx Limits") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red", "blue", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+
+
+
+#numBlocks
+p = ggplot() + 
+  geom_line(data = data50,  aes(x = time, y = blockTxs, color = "50")) +
+  geom_line(data = data100,  aes(x = time, y = blockTxs, color = "100")) +
+  geom_line(data = data150,  aes(x = time, y =blockTxs, color = "150")) +
+  #geom_line(data = data200,  aes(x = time, y = blockTxs, color = "200")) +
+  xlab('Time') +
+  ylab('Storage in #') + 
+  ggtitle("blockTxs") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red", "blue", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+
+#numBlocks
+p = ggplot() + 
+  geom_line(data = data50,  aes(x = time, y = blockStorage, color = "50")) +
+  geom_line(data = data100,  aes(x = time, y = blockStorage, color = "100")) +
+  geom_line(data = data150,  aes(x = time, y =blockStorage, color = "150")) +
+  #geom_line(data = data200,  aes(x = time, y = blockTxs, color = "200")) +
+  xlab('Time') +
+  ylab('Storage in #') + 
+  ggtitle("blockStorage") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("black","red", "blue", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9))
+print(p)
+
+
+
+
+## Section Get Tx statistics of folder with varying maxTxs/Block -----
+
+maxTxsStats <- function(){
+
+library(rlist)
+library(ggplot2)
+
+file_list = list.files(pattern="*.csv")
+file_list25=c()
+file_list25V=c()
+
+file_list50=c()
+file_list50V=c()
+
+file_list100=c()
+file_list100V=c()
+for (i in seq_along(file_list)) {
+  if (grepl("size_25_",file_list[i])){
+    if (grepl("VOLUME",file_list[i])){
+      file_list25V=c(file_list25V,file_list[i])
+    }
+    else{
+      file_list25=c(file_list25,file_list[i])
+    }
+  }
+  
+  if (grepl("size_50_",file_list[i])){
+    if (grepl("VOLUME",file_list[i])){
+      file_list50V=c(file_list50V,file_list[i])
+    }
+    else{
+      file_list50=c(file_list50,file_list[i])
+    }
+  }
+  
+  if (grepl("size_100_",file_list[i])){
+    if (grepl("VOLUME",file_list[i])){
+      file_list100V=c(file_list100V,file_list[i])
+    }
+    else{
+      file_list100=c(file_list100,file_list[i])
+    }
+  }
+}
+
+file_lists=data.frame(matrix(ncol=2, nrow=3))
+colnames(file_lists) <- c("txs","volume")
+file_lists$txs[1]=list(file_list25)
+file_lists$volume[1]=list(file_list25V)
+
+file_lists$txs[2]=list(file_list50)
+file_lists$volume[2]=list(file_list100V)
+
+file_lists$txs[3]=list(file_list100)
+file_lists$volume[3]=list(file_list100V)
+
+
+##for loop through the 3 numAgents
+for (nAgents in 1:nrow(file_lists)){
+  
+
+currentFiles=file_lists$tx[nAgents][[1]]
+currentVFiles=file_lists$volume[nAgents][[1]]
+
+#data_list <- vector("list", "length" = length(file_list))
+#refData <- data.frame(matrix(ncol = 4, nrow = length(file_list)))
+refData <- data.frame(matrix(ncol = 10 , nrow = length(currentFiles)))
+#colnames(refData) <- c("blockTime", "cTime", "orphanRate", "expectedConfirmation")
+colnames(refData) <- c("numAgents","maxTxs", "dlt", "maps", "NumTxs","TxsPerBlock","txConfirmationTime", "cTime","uniqueTxs", "numUnique")
+#######Time to confirm each TX:
+
+
+#loop through all files
+for (i in seq_along(currentFiles)) {
+  #for (i in 1) {
+  econfList = c()
+  txConfirmationTime =  c()
+  #txSubmissionTime = c()
+  filename = currentFiles[[i]]
+  print(paste(filename," ~ ",i/length(currentFiles)))
+  ## Read data in
+  df <- read.csv(filename, header = TRUE)
+  df = head(df,-20)
+  
+  agentSeen = grepl("agent_", names(df)) #index for 
+  agentSeendf = data.frame(df[agentSeen])[-1,]
+  shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
+  confirmedBlocks = df[df$confirmedBlock=="True",]
+  unconfirmedBlocks = df[df$confirmedBlock=="False",]
+  uniquetxs=c()
+  
+  
+  ##Get tx Confirmation Time and Count
+  for (j in 2:nrow(confirmedBlocks)){
+    tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[j], ",")[[1]] #returns 1, 2 3
+    txs = strsplit(confirmedBlocks$block_transactions[j], ",")[[1]] #returns tx ids, 1,2,3,4....
+    #print(tx_creation_time)
+    for (tx in txs){
+      t = strtoi(gsub("[^0-9.-]", "", tx))
+      #print(t)
+      uniquetxs = append(uniquetxs, t)
+    }
+    uniquetxs = unique(uniquetxs)
+    
+    ###tx_creation_time is list of strings
+    for (tct in tx_creation_time){ #tct = Transaction creation time
+      tct = gsub("[^0-9.-]", "", tct) 
+      #print(tct)
+      #print(strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct) )
+      temp = strtoi(confirmedBlocks$confirmationTime[j]) - strtoi(tct)
+      #print(temp)
+      #if (is.numeric(temp)==FALSE){
+      #  print(temp)
+      #  }
+      txConfirmationTime = append( txConfirmationTime, temp )
+      #txSubmissionTime =   append(txSubmissionTime,    strtoi(confirmedBlocks$arrival_time[j])    - strtoi(tct))
+    } 
+  }
+  
+  unconfirmedTxs=c()
+  for (j in 2:nrow(unconfirmedBlocks)){
+    txs = strsplit(unconfirmedBlocks$block_transactions[j], ",")[[1]] #returns tx ids, 1,2,3,4....
+    
+    for (tx in txs){
+      t = strtoi(gsub("[^0-9.-]", "", tx))
+      #print(t)
+      unconfirmedTxs = append(unconfirmedTxs, t)
+    }
+  unconfirmedTxs=unique(unconfirmedTxs)
+    
+  }
+  
+  
+  totTxs = length(unique(c(unconfirmedTxs,uniquetxs)))
+  confirmedTxsRate = length(uniquetxs)/totTxs
+  
+  ##save data
+  #refData$blockTime[i] = as.numeric(strsplit(gsub("[^0-9.-]", " ", file_list[[i]]), " +")[[1]][5])
+  ##"dlt", "maps","maxTxs", "numAgents","NumTxs","TxsPerBlock","txConfirmationTime", "cTime")
+  refData$txConfirmationRate[i] = confirmedTxsRate
+  refData$unconfirmedUniqueTxs[i] = list(unconfirmedTxs)
+  refData$unconfirmedNumUnique[i] = length(unconfirmedTxs)
+  refData$uniqueTxs[i] = list(uniquetxs)
+  refData$numUnique[i] = length(uniquetxs)
+  refData$cTime[i] = list(na.omit(txConfirmationTime))
+  refData$dlt[i] =  strsplit(gsub("_", " ",filename), " +")[[1]][2]
+  refData$maps[i] = strsplit(gsub("_", " ",filename), " +")[[1]][13]
+  #refData$numTxs[i] =  strsplit(gsub("_", " ",filename), " +")[[1]][5]
+  refData$NumTxs[i] = length(txConfirmationTime)
+  refData$TxsPerBlock[i] = length(txConfirmationTime)/(nrow(df)-1)
+  refData$maxTxs[i] = strtoi(gsub("\\..*", "",strsplit(gsub("_", " ",filename), " +")[[1]][27]))
+  refData$txConfirmationTime[i] = mean(refData$cTime[i][[1]], na.rm=TRUE)
+  refData$numAgents[i]=strsplit(gsub("_", " ",filename), " +")[[1]][9]
+  
+  
+  orphanRate = sum(df$confirmedBlock=="False")/nrow(df)
+  refData$orphanageRate[i]=orphanRate
+  reSubmitTime = mean(txConfirmationTime,na.rm=TRUE) + sd(txConfirmationTime, na.rm=TRUE)*2
+  meanTime =mean(txConfirmationTime, na.rm=TRUE)
+  refData$meanTime[i]=meanTime
+  refData$resubmitTime[i] = reSubmitTime
+  refData$expectedConfirmation[i]=0
+  orphanRate=1-confirmedTxsRate
+  for (n in 1:40){
+    temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-orphanRate)*(orphanRate**(n-1) ))
+    #print(temp)
+    refData$expectedConfirmation[i] = refData$expectedConfirmation[i] + temp
+  }
+  
+  ##calculate Storage Max
+  blockSize=8+32+32+32+8+192*2
+  #txSize = (32+4+3*36)+  (4*16) + (256) #tx data + tag
+  txSize = (32+4+3*36)+  (4*16) + (192) #tx data + tag #truncate to 192 bits, or 24 bytes
+  
+  #df <- read.csv(filename, header = TRUE)
+  data=read.csv(currentVFiles[i], header = TRUE)
+  
+  #Preprocessing
+  data$blockStorage=data$numBlocks*blockSize
+  data$txStorage=data$numTxs*txSize
+  data$blockTxStorage=data$blockTxs*txSize
+  data$totStorage=(data$blockTxStorage+data$blockStorage)*0.000125+data$txStorage*0.000125
+  
+  refData$maxStorage[i]=max(data$totStorage)
+  refData$meanStorage[i]=mean(data$totStorage)
+  
+}
+
+volumePreProcessing <- function(data){
+  
+  #Preprocessing
+  data$blockStorage=data$numBlocks*blockSize
+  data$txStorage=data$numTxs*txSize
+  data$blockTxStorage=data$blockTxs*txSize
+  data$totStorage=(data$blockTxStorage+data$blockStorage)*0.000125+data$txStorage*0.000125
+  return(data)
+}
+
+
+
+ratio=floor(max(refData$expectedConfirmation)/max(refData$maxStorage))
+p = ggplot() + 
+  #geom_line(data = refData, size=2, aes(x = maxTxs, y = TxsPerBlock*40, color = "Txs/Block")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = expectedConfirmation, color = "Confirmation Time")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = maxStorage*ratio, color = "Maximum Storage")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = meanStorage*ratio, color = "Mean Storage")) +
+  xlab('Max Txs/Block') +
+  ylab('') + 
+  ggtitle(paste("Linear PoW Balance, # Agents: ",refData$numAgents[1])) + 
+  labs(colour="Metrics")+
+  scale_color_manual(values=c("blue","red", "green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,2), legend.position=c(0.9,0.9)) +
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "Expected Confirmation Time",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~./ratio, name="Total Storage (KB)")
+  )
+print(p)
+
+} ##end of file_lists loop
+
+
+}
+
+library(ggplot2)
+#tx/Block
+p = ggplot() + 
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = TxsPerBlock*40, color = "Txs/Block")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = expectedConfirmation, color = "Confirmation Time")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = totStorage, color = "totStorage")) +
+  xlab('Max Txs/Block') +
+  ylab('') + 
+  ggtitle("Linear DLT, Block Size Statistics") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("blue","red","green"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) +
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "Expected Confirmation Time",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~./40, name="Txs/Block")
+  )
+print(p)
+
+
+p = ggplot() + 
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = TxsPerBlock*40, color = "Txs/Block")) +
+  #geom_line(data = refData, size=2, aes(x = maxTxs, y = expectedConfirmation, color = "Confirmation Time")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = totStorage, color = "totStorage")) +
+  xlab('Max Txs/Block') +
+  ylab('') + 
+  ggtitle("Linear DLT, Block Size Statistics") + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("blue","red"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) +
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "DLT Storage in KB",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~./40, name="Txs/Block")
+  )
+print(p)
+
+
+ratio=floor(max(refData$expectedConfirmation)/max(refData$totStorage))
+p = ggplot() + 
+  #geom_line(data = refData, size=2, aes(x = maxTxs, y = TxsPerBlock*40, color = "Txs/Block")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = expectedConfirmation, color = "Confirmation Time")) +
+  geom_line(data = refData, size=2, aes(x = maxTxs, y = totStorage*ratio, color = "totStorage")) +
+  xlab('Max Txs/Block') +
+  ylab('') + 
+  ggtitle(paste("Linear PoW Accumulating, # Agents: ",refData$numAgents[1])) + 
+  labs(colour="Max Txs / Block")+
+  scale_color_manual(values=c("blue","red"))+
+  theme(plot.title = element_text(size=30),legend.justification=c(1,2), legend.position=c(0.9,0.9)) +
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "Total Storage",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~./ratio, name="Txs/Block")
+  )
 print(p)
 

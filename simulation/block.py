@@ -6,16 +6,43 @@ import math
 import networkx as nx
 import copy
 import statistics
+import traceback
+
+class LightBlock:
+    def __init__(self,_version, _time, _minters, _prevBlock, _nonce, _consensus, _merkle, _txs):
+        self.version=_version #uint8
+        self.time=_time #uint32
+        self.minters=_minters #uint32[maxMinters]
+        self.prevBlock=_prevBlock #PHOTON hash 32 bytes, 256 bits
+        self.nonce=_nonce  #uint24
+        self.consensus=_consensus#Difficulty/GeoHash 8/40
+        self.merkle=_merkle #256 bits, 32 bytes
+        self.txs=_txs
+        #total size: 648 bit header
+
+    def getData(self):
+        #use int.tobytes(bits/8,'big'/'little')
+        values = [self.version, self.time ,self.minters, self.prevBlock, self.nonce, self.consensus, self.merkle, self.txs]
+        #print("\n\nVALUES:\n",values)
+        #print("\n\nBytes:\n",repr(bytes([self.version])))
+        return values
+
 
 class BaseBlock:
-    def __init__(self, txs, agents, creation_time, blockCounter, numAgents): #list of txs and agents
+    def __init__(self, txs, agents, creation_time, blockCounter, numAgents, _numRSU, _maxTxs): #list of txs and agents
+        self.maxTxs=_maxTxs
         self.blockTransactions = txs
+        if len(self.blockTransactions)>self.maxTxs:
+            sys.exit("\n\nTOO MANY TXS per BLOCK")
+        self.numTxs = len(txs)
         self.creators = agents
         self.creation_time = creation_time
         self.confirmationTime = ""
         self.id = blockCounter
         #self.blockLinks  = [blockLinks] #move to implemented classes
-        self.seen = [""]*numAgents
+        self.seen=[""]*(numAgents+_numRSU)
+        #print("\n\nBlockID: ",self.id,"\tNumRSU",_numRSU,"\n\n")
+        #traceback.print_stack()
         #for agent in agents:
             #self.seen[agent.id]=creation_time #assign creation time
             #print("\nblock: ",self.id," - agent: ",agent," - seen @ ",self.seen[agent.id])
@@ -34,8 +61,8 @@ class BaseBlock:
 
 ##block with only 1 possible link (linear)
 class LinearBlock(BaseBlock):
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks):
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents) #list of txs and agents
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks,  _numRSU, _maxTxs):
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
         #print("\t\tBLOCK: ",__blockCounter, " --? ",__txs, " ~ ",self.blockTransactions)
         if __blockLinks == None:
             self.chainNum = 0
@@ -51,8 +78,8 @@ class LinearBlock(BaseBlock):
 ##block with multiple potential links
 class DAGBlock(BaseBlock):
     ##init with BlockLinks
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, __references):
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents) #list of txs and agents
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, __references, _numRSU,_maxTxs):
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
         self.maxLinks = __references
         if __blockLinks == None:
             self.chainNum = 0
@@ -67,29 +94,13 @@ class DAGBlock(BaseBlock):
 
 
 
-class BaseStationBlock:
-    def __init__(self, txs, creationTime, blockCounter, numAgents, prevBlock): #list of txs and agents
-        self.blockTransactions = txs
-        #self.creators = agents
-        self.creation_time = creation_time
-        self.id = blockCounter
-        #self.blockLinks  = []
-        self.seen = [""]*numAgents
-        self.blockLinks = [prevBlock] #will realistically be only 1 link but this is the standardized format
-
-    def __str__(self):
-        return str(self.id)
-
-    def __repr__(self):
-        return str(self.id)
-
 ##hashgraph nodes:
 #timestamp, txs, self-latest-hash, gossipers-latest-hash
 #1 hash is self, 2nd is gossiper's
 class HashGraphBlock:
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks):
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, _numRSU,_maxTxs):
 
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents) #list of txs and agents
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
 
         self.witness = False #first of new round = chainNum
         self.famous = False #popular
