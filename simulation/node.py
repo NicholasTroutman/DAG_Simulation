@@ -20,13 +20,25 @@ class Node:
         self.coordinates= [] #list of double x and y coordinates in double [x,y]
         #self.radius=18.63 #hardcoded radius of p2p connectivity
 
-        radiusDic = {"Houstonredblue.jpg": 44, "HoustonHwyredblue.jpg": 27.96}
+        ##TODO: Option to switch between lpwan/wifi/bluetooth
+        radiusDic = {"Houstonredblue.jpg": 568.3, "HoustonHwyredblue.jpg": 25.085227} ##LPWAN
+        #radiusDic = {"Houstonredblue.jpg": 44.01, "HoustonHwyredblue.jpg": 1.42045454545} ##WIFI
+        #radiusDic = {"Houstonredblue.jpg": 17.6056338028, "HoustonHwyredblue.jpg": 0.56818181818} ##BlueTooth
+
+        ##speedDic = {"Houstonredblue.jpg": 7.744, "HoustonHwyredblue.jpg": 0.541} #0.541*60=32
+
         ##Houston Downtown Distance: 500ft/88 pixels = 5.681818 ft/pixel
         ##Wifi Downtown Distance = 150-300 ft, call it 250ft --> 250/5.68 = 44.01
+        ##BlueTooth Downtown Distance = 100 ft, 100/5.68 = 44.01
+        ###LPWAN Urban = 0.9838 km ~ 3227.69029ft --> 3228/5.68 = 568.3
 
         ##Houstonhwy Distance: 2*5280ft/60 pixels = 176 ft/pixel
-        ##Wifi Distance = 150-300 ft, call it 300ft --> 300/176 = 1.7
+        ##Wifi Distance = 150-300 ft, call it 250ft --> 250ft/176 = 1.42045454545
         ##LPWAN Distance = 2km, call it 1.5km ~ 4921ft -->  4921/176 = 27.96
+        ##Bluetooth Distance = 100ft -->100/176 = 0.56818181818
+
+        ##Urban LPWAN Distance = 1.34578 km ~ 4415.28871ft --> 4415/176 = 25.085227
+        ##Rural Not Elevetated LoS: 2.2251 km
 
         self.radius=radiusDic[_map] #hardcoded radius of p2p connectivity
         #print(self.radius)
@@ -54,19 +66,26 @@ class Node:
         self.numBlocks = 0
         self.blockTxs = 0 #how many txs/block
 
+        ##storage data (called volume) for records
         self.maxNumTxs = 0
         self.maxNumBlocks = 0
         self.storageData = []
 
-        ##Don't resubmit txs
-        #self.resubmitTxs = []
+        ##p2pdata for latency/reconcilliation
+        self.p2pData = []
+        self.p2pTime = [] ##length of each p2pInteraction
+        self.p2pHistory = []##We define them as contigous
 
+        self.txTrade = []
 
 
     #VOLUME FUNCTIONS (storage)
     def recordVolume(self, time):
         self.storageData.append([time, self.numTxs, self.numBlocks, self.maxNumTxs, self.maxNumBlocks, self.blockTxs])
 
+    def recordP2P(self, time, uVisTx, dVisTx, tVisTx, uSubTx, dSubTx, tSubTx,  uConTx, dConTx, tConTx, uVisBlock, dVisBlock, tVisBlock, uLinkBlock, dLinkBlock, tVLinkBlock,uTxs, dTxs, tTxs, uBlocks, dBlocks, tBlocks): ##p2pTime
+        ##todo add time for p2p interaction
+        self.p2pData.append([time, uVisTx, dVisTx, tVisTx, uSubTx, dSubTx, tSubTx,  uConTx, dConTx, tConTx, uVisBlock, dVisBlock, tVisBlock, uLinkBlock, dLinkBlock, tVLinkBlock,uTxs, dTxs, tTxs, uBlocks, dBlocks, tBlocks])
 
     ##add functions
 
@@ -234,6 +253,7 @@ class Node:
             newConfirmedtxs = list(set(newConfirmedTxs))
 
             if len(newConfirmedTxs)>0:
+                #print("AGENT: ",self.id, " adding: ", newConfirmedTxs, "Time: ", time)
                 self.add_confirmed_transactions(newConfirmedTxs, time)
 
 ##Get Functions

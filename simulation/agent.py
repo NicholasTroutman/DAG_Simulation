@@ -16,7 +16,7 @@ class Agent(Node):
         self.lastMintedBlock = 0
         #self.speed=40 #testing purpose
         #self.speed=7.74 #NICK HARDCODED THIS for Houston
-        speedDic = {"Houstonredblue.jpg": 7.744, "HoustonHwyredblue.jpg": 0.541*60} #0.541*60=32
+        speedDic = {"Houstonredblue.jpg": 7.744, "HoustonHwyredblue.jpg": 0.541} #0.541*60=32
         ##Houston Downtown Distance: 500ft/88 pixels = 5.681818 ft/
         ##Houston Downtown Speed: 30mph =  44ft/sec --> (44 ft/sec)/ (5.6818 ft/pixel) = 7.74400000248 pixels/second
 

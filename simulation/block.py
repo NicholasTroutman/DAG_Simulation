@@ -29,16 +29,19 @@ class LightBlock:
 
 
 class BaseBlock:
-    def __init__(self, txs, agents, creation_time, blockCounter, numAgents, _numRSU, _maxTxs): #list of txs and agents
+    def __init__(self, txs, agents, creation_time, blockCounter, numAgents, _numRSU, _maxTxs, _minTxs): #list of txs and agents
         self.maxTxs=_maxTxs
+        self.minTxs=_minTxs
         self.blockTransactions = txs
-        if len(self.blockTransactions)>self.maxTxs:
-            sys.exit("\n\nTOO MANY TXS per BLOCK")
+        self.id = blockCounter
+
+        if self.id!=0:
+            if len(self.blockTransactions)>self.maxTxs or len(self.blockTransactions)<self.minTxs:
+                sys.exit("\n\nTOO MANY/FEW TXS per BLOCK")
         self.numTxs = len(txs)
         self.creators = agents
         self.creation_time = creation_time
         self.confirmationTime = ""
-        self.id = blockCounter
         #self.blockLinks  = [blockLinks] #move to implemented classes
         self.seen=[""]*(numAgents+_numRSU)
         #print("\n\nBlockID: ",self.id,"\tNumRSU",_numRSU,"\n\n")
@@ -61,8 +64,8 @@ class BaseBlock:
 
 ##block with only 1 possible link (linear)
 class LinearBlock(BaseBlock):
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks,  _numRSU, _maxTxs):
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks,  _numRSU, _maxTxs, _minTxs):
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs, _minTxs) #list of txs and agents
         #print("\t\tBLOCK: ",__blockCounter, " --? ",__txs, " ~ ",self.blockTransactions)
         if __blockLinks == None:
             self.chainNum = 0
@@ -78,8 +81,8 @@ class LinearBlock(BaseBlock):
 ##block with multiple potential links
 class DAGBlock(BaseBlock):
     ##init with BlockLinks
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, __references, _numRSU,_maxTxs):
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, __references, _numRSU,_maxTxs, _minTxs):
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs, _minTxs) #list of txs and agents
         self.maxLinks = __references
         if __blockLinks == None:
             self.chainNum = 0
@@ -98,9 +101,9 @@ class DAGBlock(BaseBlock):
 #timestamp, txs, self-latest-hash, gossipers-latest-hash
 #1 hash is self, 2nd is gossiper's
 class HashGraphBlock:
-    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, _numRSU,_maxTxs):
+    def __init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, __blockLinks, _numRSU,_maxTxs, _minTxs):
 
-        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs) #list of txs and agents
+        BaseBlock.__init__(self, __txs, __agents, __creation_time, __blockCounter, __numAgents, _numRSU,_maxTxs, _minTxs) #list of txs and agents
 
         self.witness = False #first of new round = chainNum
         self.famous = False #popular

@@ -321,7 +321,7 @@ def confirmationLayer_importer(simulation, file_name):
        reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
        #data_list = list(reader)
 
-       #print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap, " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ", simulation.group)
+       print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap, " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ", simulation.group)
       # print("\n\n")
        for row in reader:
            blockTime = row['blockTime']
@@ -345,6 +345,7 @@ def confirmationLayer_importer(simulation, file_name):
                if (simulation.DLTMode == dlt and int(simulation.references) == int(refs)):
 
                    if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                       #print("Found ConfirmationNumber: ",row['confirmationNumber'],"\t",row)
                        return int(row['confirmationNumber'])
             #sys.exit("MATCH DEBUGGING DONE")
 
@@ -384,10 +385,12 @@ def confirmationLayer_importer(simulation, file_name):
                    if (simulation.DLTMode == dlt and int(2) == int(refs)):
 
                        if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                          # print("Found ConfirmationNumber: ",row['confirmationNumber'])
                            return int(row['confirmationNumber'])
 
 
        print("NO CONFIRMATION LAYER FOUND, USE THESE RESULTS FOR COMPUTING CONFIRMATION LAYER")
+       sys.exit("NO CONF, ERROR")
        return int(3)
 
 def csv_export(self, file_name):
@@ -476,3 +479,52 @@ def volume_export(self,file_name):
         #writer.writerow([0,[],0, '', 0, 0])
         for line in self.agents[0].storageData:
             writer.writerow(line)
+
+
+def p2p_export(self,file_name1,file_name2):
+    ##Don't need interaction for now
+    #with open(file_name1, 'w', newline='') as file:
+    #    writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+    #    headers = ['time', 'uVisTx', 'dVisTx', 'tVisTx', 'uSubTx', 'dSubTx', 'tSubTx',  'uConTx', 'dConTx', 'tConTx', 'uVisBlock', 'dVisBlock', 'tVisBlock', 'uLinkBlock', 'dLinkBlock', 'tLinkBlock','uTxs', 'dTxs', 'tTxs', 'uBlocks', 'dBlocks', 'tBlocks']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+    #    writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+    #    for agent in self.agents:
+    #        for line in agent.p2pData:
+    #            writer.writerow(line)
+    with open(file_name2, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['time,','selfagentid', 'agentid','p2pTime']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for agent in self.agents:
+            for line in agent.p2pHistory:
+                writer.writerow(line)
+
+
+def tx_export(self,file_name):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['type','time', 'numTxs', 'txid', 'txAgent', 'arrival_time', 'age', 'recipientAgent', 'new']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for agent in self.agents:
+            for line in agent.txTrade:
+                writer.writerow(line)

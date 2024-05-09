@@ -66,8 +66,8 @@ class Transaction:
 
 
 class DHTTransaction(Transaction):
-    def __init__(self, _arrival_time, _counter, _numAgents, _outTx, _consensusCode): #initialize with numAgents for seen variable
-        Transaction.__init__(self, _arrival_time, _counter, _numAgents)
+    def __init__(self, _arrival_time, _counter, _numAgents, _outTx, _consensusCode, _numRSUs): #initialize with numAgents for seen variable
+        Transaction.__init__(self, _arrival_time, _counter, _numAgents, _numRSUs)
         self.outTx = _outTx
         self.hash =int(hashlib.sha256(str(self.id).encode('utf-8')).hexdigest(), 16) % 10**8
         self.verifier = _consensusCode[self.hash%len(_consensusCode)] #assign verifier

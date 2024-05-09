@@ -30,10 +30,15 @@ class Multi_Agent_Simulation:
                  _agent_choice = None, _printing = False, _lambda_m = 1/60,  \
                  _seed = 1, _DLTMode = "linear", _consensus = "individual",  \
                  _importMap = "Error", _blockTime = 40, _references = 1, _group = 1, \
-                 _volume = 0, _basestations = 0, _pruning = 0, _balance = 0, _maxTxs = 10):
+                 _volume = 0, _basestations = 0, _pruning = 0, _balance = 0, _maxTxs = 130, \
+                 _minTxs = 0, _keep = 100, _p2p=0, _prefilterTime=6000):
 
         ##define
+        self.prefilterTime=_prefilterTime
+        self.p2p=_p2p
+        self.keep = _keep
         self.maxTxs=_maxTxs
+        self.minTxs=_minTxs
         self.consensus = _consensus #individual (PoW), near (PoS)
         #self.consensus_selection() ##assign self.create_block to either individual or near
         self.basestations=_basestations #number of base stations
@@ -141,6 +146,9 @@ class Multi_Agent_Simulation:
                 self.agents.append(DHTAgent(agent_counter, self.importMap))
             else:
                 self.agents.append(Agent(agent_counter,  self.importMap))
+
+            if (self.p2p):
+                self.agents[agent_counter].p2pTime=[0 for _ in range(self.no_of_agents)] ##length of each p2pInteraction
             agent_counter += 1
 
         #Create directed graph object
@@ -176,7 +184,10 @@ class Multi_Agent_Simulation:
         #Create random arrival times Txs
         np.random.seed(self.seed)
         inter_arrival_times = np.random.exponential(1 / self.lam, self.no_of_transactions)
+        #print(inter_arrival_times)
+
         self.arrival_times = list(np.cumsum(inter_arrival_times))
+
 
         maxArrivalTime = max(self.arrival_times)
 
@@ -186,7 +197,7 @@ class Multi_Agent_Simulation:
         if self.consensus == "individual" and (self.DLTMode == "linear" or self.DLTMode == "dag"): #PoW
             np.random.seed(self.seed)
             #inter_arrival_times = np.random.exponential(40 / self.lam, int(self.no_of_transactions/40) ) #5x tx rate HARDCODED NT TODO: MAKE DYNAMIC NICK
-            inter_arrival_times = np.random.exponential(self.blockTime / self.lam, int(self.no_of_transactions/self.blockTime) )
+            inter_arrival_times = np.random.exponential(self.blockTime / 1, int(self.no_of_transactions/(self.blockTime*self.lam)) )
             #print("\n")
             #print(inter_arrival_times)
             #print("\n")
@@ -310,7 +321,7 @@ class Multi_Agent_Simulation:
 
         dir_name = './routes/'
         suffix = '.csv'
-        base_name = self.importMap+"_txs"+str(self.no_of_transactions)+"_agents"+str(self.no_of_agents) + "_seed"+ str(self.seed)
+        base_name = self.importMap+"_txs"+str(self.no_of_transactions)+"_agents"+str(self.no_of_agents) + "_seed"+ str(self.seed) + "_lambda"+str(self.lam)
 
         routesFileName = os.path.join(dir_name, base_name + suffix)
         print(routesFileName)
@@ -381,8 +392,10 @@ class Multi_Agent_Simulation:
         for agent in self.agents:
             if self.printing:
                 agent.past_coordinates.append(agent.coordinates)
-            prevCoordinates = agent.coordinates #DEBUGGING REMOVE ME
-            ##old system random walk
+            else:
+                agent.past_coordinates = agent.coordinates
+            #prevCoordinates = agent.coordinates #DEBUGGING REMOVE ME
+            ##old system random walkF
             #agent.coordinates=agent.coordinates + np.random.normal(0,6,2)*(transaction.arrival_time-prevTime)
 
             #new system directed TSP
@@ -436,56 +449,49 @@ class Multi_Agent_Simulation:
 
 
 
-    ##clean all old txs/blocks
-    def cleanOldTxsAndBlocks(self, transaction):
-        lowerBound = 800
-        if self.consensus == "near":
-            lowerBound=1200
-        if self.DLTMode == "hashgraph":
-            lowerbound = 1200
-        currentTime = transaction.arrival_time
+    ##clean all submitted/confirmed txs older than keep time, and linked block older than keep time
+    def cleanOldTxsAndBlocks(self, time):
+        #print("CLEAN OLD TXS AND BLOCKS")
+        keepTime=self.keep
 
-        if (transaction.id >= 0 and transaction.id % lowerBound == 0):
-            #print("CLEANING")
-            ##remove old txs
-            for agent in self.agents:
+        for agent in self.agents:
+            #remove old confirmed txs
+            #numStayingTxs = 0
+            keepTxs = []
+            for tx in agent.get_confirmed_transactions():
+                #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
+                if time - tx.arrival_time < keepTime: ##MAGIC NUMBER
+                    keepTxs.append(tx)
+                    #numStayingTxs +=1
 
+            agent._confirmed_transactions = keepTxs
+            #print("\n\nClean ConTxs Age: ",agent.id)
+            #print(agent.get_confirmed_transactions())
+            #print([time-b.arrival_time for b in agent.get_confirmed_transactions()])
 
-                #remove old confirmed txs
-                #numStayingTxs = 0
-                keepTxs = []
-                for tx in agent.get_confirmed_transactions():
-                    #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
-                    if currentTime - tx.arrival_time < lowerBound: ##MAGIC NUMBER
-                        keepTxs.append(tx)
-                        #numStayingTxs +=1
+            ##Remove old submitted Txs
+            #numStayingTxs = 0
+            keepTxs = []
+            for tx in agent.get_submitted_transactions():
+                #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
+                if time - tx.arrival_time < keepTime: ##MAGIC NUMBER
+                    keepTxs.append(tx)
+                    #numStayingTxs +=1
+            agent._submitted_transactions = keepTxs
 
-                agent._confirmed_transactions = keepTxs
-
-
-                ##Remove old submitted Txs
-                #numStayingTxs = 0
-                keepTxs = []
-                for tx in agent.get_submitted_transactions():
-                    #print("Tx_arrival_time: ",transaction.arrival_time, " DIFF: ",transaction.arrival_time - tx.arrival_time)
-                    if currentTime - tx.arrival_time < lowerBound: ##MAGIC NUMBER
-                        keepTxs.append(tx)
-                        #numStayingTxs +=1
-                agent._submitted_transactions = keepTxs
-
-                #agent.numTxs = len(agent._visible_transactions) #len(agent._submitted_transactions) + len(agent._visible_transactions) + len(agent._confirmed_transactions)
+            #agent.numTxs = len(agent._visible_transactions) #len(agent._submitted_transactions) + len(agent._visible_transactions) + len(agent._confirmed_transactions)
 
 
-                #remove old linked_blocks
-                keepBlocks=[]
-                for block in agent.get_linked_blocks():
-                    if currentTime - block.creation_time < lowerBound: ##MAGIC NUMBER 800
-                        keepBlocks.append(block)
-                #agent._confirmed_blocks = keepBlocks
-                agent._linked_blocks = keepBlocks
+            #remove old linked_blocks
+            keepBlocks=[]
+            for block in agent.get_linked_blocks():
+                if time - block.creation_time < keepTime:
+                    keepBlocks.append(block)
+            #agent._confirmed_blocks = keepBlocks
+            agent._linked_blocks = keepBlocks
 
-                agent.numBlocks = len(agent._visible_blocks) + len(agent._linked_blocks)
-                agent.blockTxs = sum(b.numTxs for b in agent._visible_blocks) +  sum(b.numTxs for b in agent._linked_blocks)
+            agent.numBlocks = len(agent._visible_blocks) + len(agent._linked_blocks)
+            agent.blockTxs = sum(b.numTxs for b in agent._visible_blocks) +  sum(b.numTxs for b in agent._linked_blocks)
 
 
     ##clean unconfirmed blocks we've passed by a lot
@@ -527,11 +533,12 @@ class Multi_Agent_Simulation:
 
     ##Clean old txs/blocks, but keep 2/numAgents acoording to ID
     def pruneTxsAndBlocks(self, time):
-        keepTime = 150 #arbitrary #
-        if self.consensus == "near":
-            keepTime=200
-        if self.DLTMode == "hashgraph":
-            keepTime = 200
+        keepTime=self.keep ##from cli
+        #keepTime = 150 #arbitrary #
+        #if self.consensus == "near":
+        #    keepTime=200
+        #if self.DLTMode == "hashgraph":
+        #    keepTime = 200
 
         ##remove old txs
         for agent in self.agents:
@@ -575,9 +582,13 @@ class Multi_Agent_Simulation:
             #remove old linked_blocks
             keepBlocks=[]
             for block in agent.get_linked_blocks():
+                #if agent.id==0:
+                    #print("\n",time,": Block :",block.id," --> ",block.id%(self.no_of_agents/2)," ?= ",agent.id%(self.no_of_agents/2))
                 if time - block.creation_time < keepTime: ##MAGIC NUMBER
                     keepBlocks.append(block)
                 elif block.id%(self.no_of_agents/2) == agent.id%(self.no_of_agents/2): #also keep
+                    #if agent.id==0:
+                    #    print("\nSAVE ",block.id," to Agent 0:\t",len(agent._pruned_blocks),"\t",agent._pruned_blocks)
                     agent._pruned_blocks.append(block)
             #agent._confirmed_blocks = keepBlocks
             agent._linked_blocks = keepBlocks
@@ -589,11 +600,12 @@ class Multi_Agent_Simulation:
 
     def balanceBased(self,time):
         #print("BALANCE")
-        keepTime = 200
-        if self.consensus == "near":
-            keepTime=200
-        if self.DLTMode == "hashgraph":
-            keepTime = 200
+        keepTime=self.keep
+        #keepTime = 200
+        #if self.consensus == "near":
+        #    keepTime=200
+        #if self.DLTMode == "hashgraph":
+        #    keepTime = 200
 
 
         ##remove old txs
@@ -652,13 +664,13 @@ class Multi_Agent_Simulation:
         #print(blockLinks)
         #print("\n\nCREATEBLOCK ",agents,":\t",blockLinks)
         if self.DLTMode == "linear":
-            return LinearBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs)
+            return LinearBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs, self.minTxs)
         elif self.DLTMode == "dag":
-            return DAGBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, self.references, basestations, self.maxTxs)
+            return DAGBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, self.references, basestations, self.maxTxs, self.minTxs)
         elif self.DLTMode == "hashgraph":
-            return HashGraphBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs)
+            return HashGraphBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs, self.minTxs)
         elif self.DLTMode == "dht":
-            return LinearBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs)
+            return LinearBlock(txs, agents, creation_time, blockCounter, numAgents, blockLinks, basestations, self.maxTxs, self.minTxs)
 
         else:
             sys.exit("ERROR: DLTMODE invalid:\t",str(self.DLTMODE))
@@ -744,18 +756,20 @@ class Multi_Agent_Simulation:
             for transaction in mintedTxs: #for each minted tx since last time increment
                 transaction.agent = np.random.choice(self.agents, p=self.agent_choice) #choose agent
                 transaction.agent.add_visible_transactions([transaction],  transaction.arrival_time) #add tips to minted tx
-                if self.basestations>0 and self.pruning==0 and self.balance==0: #don't clean, give to bsus
-                    if i%10==0:
-                        self.cleanOldTxsAndBlocks(transaction) ##Do something every 400 to clean visible_transactions
-                elif self.pruning: #PRUNE OLDIES
-                    if i%10==0:
+                if i%10==0:
+                    if self.basestations>0 and self.pruning==0 and self.balance==0: #don't clean, give to bsus
+                        self.cleanOldTxsAndBlocks(i) ##Do something every 10 to clean visible_transactions
+                    elif self.pruning: #PRUNE OLDIES
                         self.pruneTxsAndBlocks(i)
-                elif self.balance:
-                    if i%10==0:
+                    elif self.balance:
                         self.balanceBased(i)
-                elif self.basestations==0:
-                    if i%10==0:
-                        self.cleanUnconfirmedBlocks(i)
+                    #elif self.basestations==0:
+                        #self.cleanUnconfirmedBlocks(i) ##do we need this?
+                    else:
+                        self.cleanOldTxsAndBlocks(i) ##clean old txs
+
+                    #print("\n\nTime: ",i)
+                    #print(self.transactions[10].seen)
 
 
                 ##Find outTx: last tx from same agent
@@ -788,6 +802,8 @@ class Multi_Agent_Simulation:
                             ##maxTxs check
                             if len(txs)>self.maxTxs:
                                 txs=sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id)[:self.maxTxs]
+                            elif len(txs)<self.minTxs:
+                                break #too few txs
                                 #txs=txs[:self.maxTxs]
                             #print("\tminting txs:",sorted(txs, key=lambda x: x.id))
                             #createBlock(self, txs, agents, creation_time, blockCounter, numAgents, blockLinks):
@@ -995,6 +1011,50 @@ class Multi_Agent_Simulation:
                         self.not_visible_transactions.append(transaction)
 
 
+    ##Within [0,1] seconds ago, when were these agents exactly r apart (within range)
+    ##use staiar
+    def inRange(self, agent1, agent2):
+        ##are agents currently in range?
+        startInRange=-1
+
+        distance = math.hypot(agent1.coordinates[0] - agent2.coordinates[0], agent1.coordinates[1] - agent2.coordinates[1])
+        #print("\n\nInRange Start dis: ",distance-agent1.radius)
+        #print("past_coordinate 1: ",agent1.past_coordinates)
+        #if len(agent1.past_coordinates)>0:
+            #print("prev distance: ",math.hypot(agent1.past_coordinates[0] - agent2.past_coordinates[0], agent1.past_coordinates[1] - agent2.past_coordinates[1])- agent1.radius)
+        if (distance< agent1.radius):
+            inRange=-1, ##currently in range
+        else:
+            inRange=+1 ##not in range currently
+
+        ##hardcode all distances between agent1 and agent2
+        # for i in range(0,10):
+        #     i=-i/10
+        #     distance=math.hypot((agent1.coordinates[0] + agent1.vector[0]*i*agent1.speed) - (agent2.coordinates[0] + agent2.vector[0]*i*agent2.speed), (agent1.coordinates[1] + agent1.vector[1]*i*agent1.speed) - (agent2.coordinates[1] + agent2.vector[1]*i*agent2.speed))
+        #     print(i,"\t",distance-agent1.radius)
+        #
+        # for i in range(0,10):
+        #     i=i/10
+        #     distance=math.hypot((agent1.coordinates[0] + agent1.vector[0]*i*agent1.speed) - (agent2.coordinates[0] + agent2.vector[0]*i*agent2.speed), (agent1.coordinates[1] + agent1.vector[1]*i*agent1.speed) - (agent2.coordinates[1] + agent2.vector[1]*i*agent2.speed))
+        #     print(i,"\t",distance-agent1.radius)
+        #sys.exit("DEBUG")
+
+        timeDiff=1
+        timeIncrement=0.5
+        while (True):
+            distance=math.hypot((agent1.coordinates[0] + agent1.vector[0]*timeIncrement*agent1.speed*startInRange) - (agent2.coordinates[0] + agent2.vector[0]*timeIncrement*agent2.speed*startInRange), (agent1.coordinates[1] + agent1.vector[1]*timeIncrement*agent1.speed*startInRange) - (agent2.coordinates[1] + agent2.vector[1]*timeIncrement*agent2.speed*startInRange))
+            timeDiff=timeDiff/2
+            #within half a meter of range, close enough
+            #print(timeIncrement, ":  ",distance-agent1.radius,"\t x1 = ",agent1.coordinates[0] - agent1.vector[0]*timeIncrement)
+            if abs(distance-agent1.radius) < 0.05:
+                return (timeIncrement)
+            elif (distance-agent1.radius)<0: #negative, too close, back in time-->1
+                timeIncrement = timeIncrement + (timeDiff/2 )
+            else: ##postive, too close, more recent -->0
+                timeIncrement = timeIncrement - (timeDiff/2 )
+
+            if timeDiff<0.5**15:
+                return (1)
 
 
 
@@ -1024,67 +1084,211 @@ class Multi_Agent_Simulation:
                                 neighborsCount += 1
                                 neighbors.append(agents[i])
 
-                                # if index==2:
-                                #print("\n\nAGENT 2 TRANSFER [index]")
-                                #print("\n\n\tVisTxs ",index,": ",sorted(agents[index].get_visible_transactions(), key=lambda x: x.id, reverse=False ))
-                                #print("\tVisTxs ",i,": ",sorted(agents[i].get_visible_transactions(), key=lambda x: x.id, reverse=False ))
+                                #record p2pTime
+                                if (self.p2p):
+                                    #continuation
+                                    if agents[index].p2pTime[i]>0: ##still in range add 1
+                                        agents[index].p2pTime[i]=agents[index].p2pTime[i]+1 #increment 1
+
+                                        ##80/81 is hardcoded as a 10% threshold
+                                        if 80<=agents[index].p2pTime[i]>81: ##trade all other txs/blocks
+
+                                            indexVisBlocks = agents[index].get_visible_blocks().copy()
+                                            iVisBlocks = agents[i].get_visible_blocks()
+
+                                            #indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
+                                            #iConfirmedBlocks =  agents[i].get_confirmed_blocks()
+                                            indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
+                                            iLinkedBlocks =  agents[i].get_linked_blocks()
+
+                                            ##Trade txs
+                                            #get txs
+                                            indexVisibleTxs = agents[index].get_visible_transactions().copy()
+                                            iVisibleTxs = agents[i].get_visible_transactions()
 
 
-                                ##trade blocks
-                                #get blocks
-                                indexVisBlocks = agents[index].get_visible_blocks()
-                                iVisBlocks = agents[i].get_visible_blocks()
+                                            indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
+                                            iSubmittedTxs = agents[i].get_submitted_transactions()
 
-                                #indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
-                                #iConfirmedBlocks =  agents[i].get_confirmed_blocks()
-                                indexLinkedBlocks =  agents[index].get_linked_blocks()
-                                iLinkedBlocks =  agents[i].get_linked_blocks()
+                                            indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
+                                            iConfirmedTxs = agents[i].get_confirmed_transactions()
 
-                                #Trade blocks
-                                agents[index].add_visible_blocks(iVisBlocks, time)
-                                agents[i].add_visible_blocks(indexVisBlocks, time)
+                                            #Trade blocks
+                                            agents[index].add_visible_blocks(iVisBlocks, time)
+                                            agents[i].add_visible_blocks(indexVisBlocks, time)
 
-                                #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
-                                #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
-                                agents[index].add_linked_blocks(iLinkedBlocks, time)
-                                agents[i].add_linked_blocks(indexLinkedBlocks, time)
-
-                                ##Trade txs
-                                #get txs
-                                indexVisibleTxs = agents[index].get_visible_transactions()
-                                iVisibleTxs = agents[i].get_visible_transactions()
-
-                                indexSubmittedTxs = agents[index].get_submitted_transactions()
-                                iSubmittedTxs = agents[i].get_submitted_transactions()
-
-                                indexConfirmedTxs = agents[index].get_confirmed_transactions()
-                                iConfirmedTxs = agents[i].get_confirmed_transactions()
-
-                                #trade txs
-                                agents[index].add_visible_transactions(iVisibleTxs, time)
-
-                                agents[i].add_visible_transactions(indexVisibleTxs, time)
-                                #CHECK FOR agent 0 visible_tx
-                                minIndex= min(i,index)
+                                            #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                            #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+                                            agents[index].add_linked_blocks(iLinkedBlocks, time)
+                                            agents[i].add_linked_blocks(indexLinkedBlocks, time)
 
 
-                                agents[index].add_submitted_transactions(iSubmittedTxs, time)
-                                agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+                                            #Add all txs/blocks
+                                            agents[index].add_visible_transactions(iVisibleTxs, time)
+                                            agents[i].add_visible_transactions(indexVisibleTxs, time)
 
-                                agents[index].add_confirmed_transactions(iConfirmedTxs, time)
-                                agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+                                            agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                            agents[i].add_submitted_transactions(indexSubmittedTxs, time)
 
-                                #print("\nAFTER\n\tVisTxs ",index,": ",sorted(agents[index].get_visible_transactions(), key=lambda x: x.id, reverse=False ))
-                                #print("\tVisTxs ",i,": ",sorted(agents[i].get_visible_transactions(), key=lambda x: x.id, reverse=False ))
+                                            agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                            agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
 
-                                # if index==2:
-                                #     print("\n\nAfter [index]")
-                                #     print("\tVisBlocks: ",agents[index].get_visible_blocks())
-                                #     print("\tLinkedBlocks: ",agents[index].get_linked_blocks())
-                                # if i==2:
-                                #     print("\n\nAfter [i]")
-                                #     print("\tVisBlocks: ",agents[i].get_visible_blocks())
-                                #     print("\tLinkedBlocks: ",agents[i].get_linked_blocks())
+                                    elif agents[index].p2pTime[i]==0: ##new interaction
+                                        #print("\n\ncall inRange: ",time, "\tValue = ",agents[index].p2pTime[i], "\tprev = ",math.hypot( agents[index].past_coordinates[0] -  agents[i].past_coordinates[0],  agents[index].past_coordinates[1] -  agents[i].past_coordinates[1]))
+                                        if time >1 and math.hypot( agents[index].past_coordinates[0] -  agents[i].past_coordinates[0],  agents[index].past_coordinates[1] -  agents[i].past_coordinates[1])<  agents[index].radius:
+                                            #print("classose Last Time, use 1")
+                                            agents[index].p2pTime[i]=1
+                                        else: ##newly in range, p2pTime new
+                                            agents[index].p2pTime[i] =  self.inRange(agents[index],agents[i])
+                                        #print("Start time: ",agents[index].p2pTime[i])
+                                        #add increment
+
+                                        ##Only happen if new interaction, not redundant
+                                        ##trade blocks
+                                        #get blocks
+                                        indexVisBlocks = agents[index].get_visible_blocks().copy()
+                                        iVisBlocks = agents[i].get_visible_blocks()
+
+                                        #indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
+                                        #iConfirmedBlocks =  agents[i].get_confirmed_blocks()
+                                        indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
+                                        iLinkedBlocks =  agents[i].get_linked_blocks()
+
+                                        ##Trade txs
+                                        #get txs
+                                        indexVisibleTxs = agents[index].get_visible_transactions().copy()
+                                        iVisibleTxs = agents[i].get_visible_transactions()
+                                        #if index==0:
+                                            #print(indexVisibleTxs)
+                                            #print(iVisibleTxs)
+
+                                        indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
+                                        iSubmittedTxs = agents[i].get_submitted_transactions()
+
+                                        indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
+                                        iConfirmedTxs = agents[i].get_confirmed_transactions()
+
+
+                                        ##apply prefilter #self.prefilterTime
+                                        ##txs
+                                        oldvisTxLen=len(indexVisibleTxs)
+                                        indexVisibleTxs = [youngTx for youngTx in indexVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+                                        iVisibleTxs = [youngTx for youngTx in iVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+
+                                        indexSubmittedTxs = [youngTx for youngTx in indexSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+                                        iSubmittedTxs = [youngTx for youngTx in iSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+
+                                        indexConfirmedTxs = [youngTx for youngTx in indexConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+                                        iConfirmedTxs = [youngTx for youngTx in iConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
+
+                                        ###blocks
+                                        indexVisBlocks = [youngBlock for youngBlock in indexVisBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
+                                        iVisBlocks = [youngBlock for youngBlock in iVisBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
+
+                                        indexLinkedBlocks = [youngBlock for youngBlock in indexLinkedBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
+                                        iLinkedBlocks = [youngBlock for youngBlock in iLinkedBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
+
+                                        if (self.p2p):
+                                            #indexTxs = agents[index].get_visible_transactions() + agents[index].get_submitted_transactions()  + agents[index].get_confirmed_transactions()
+                                            #iTxs = agents[i].get_visible_transactions() + agents[i].get_submitted_transactions()  + agents[i].get_confirmed_transactions()
+                                            indexTxs = indexVisibleTxs +  indexSubmittedTxs + indexConfirmedTxs
+                                            iTxs = iVisibleTxs +  iSubmittedTxs + iConfirmedTxs
+
+                                            indexBlocks = agents[index].get_visible_blocks() + agents[index].get_linked_blocks()
+                                            iBlocks =         agents[i].get_visible_blocks() +     agents[i].get_linked_blocks()
+
+                                            uTxs =    set(indexTxs).union(set(iTxs))
+                                            uBlocks = set(indexBlocks).union(set(iBlocks))
+
+                                            #dTxs = set(uTxs) - set(indexTxs)
+                                            #dBlocks = set(uBlocks) - set(indexBlocks)
+                                            dTxs = set(uTxs) - set(iTxs)
+                                            dBlocks = set(uBlocks) - set(iBlocks)
+
+                                            tTxs =    [time - t.arrival_time for t in dTxs]
+                                            tBlocks = [time - t.creation_time for t in dBlocks]
+
+                                        #Trade blocks
+                                        agents[index].add_visible_blocks(iVisBlocks, time)
+                                        agents[i].add_visible_blocks(indexVisBlocks, time)
+
+                                        #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                        #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+                                        agents[index].add_linked_blocks(iLinkedBlocks, time)
+                                        agents[i].add_linked_blocks(indexLinkedBlocks, time)
+
+
+                                        #trade txs
+                                        agents[index].add_visible_transactions(iVisibleTxs, time)
+                                        agents[i].add_visible_transactions(indexVisibleTxs, time)
+
+                                        agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                        agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+
+                                        agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                        agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+
+
+
+                                        ##record p2p interactions
+                                        if (self.p2p):
+                                            #txs
+                                            unionVisTxSize =        len(agents[index].get_visible_transactions())
+                                            unionSubmittedTxSize =  len(agents[index].get_submitted_transactions())
+                                            unionConfirmedTxSize =  len(agents[index].get_confirmed_transactions())
+
+
+                                            ##difference
+                                            dVisTxs = set(agents[index].get_visible_transactions()) - set(indexVisibleTxs)
+                                            dSubTxs = set(agents[index].get_submitted_transactions()) - set(indexSubmittedTxs)
+                                            dConTxs = set(agents[index].get_confirmed_transactions()) - set(indexConfirmedTxs)
+
+                                            dVisBlocks  = set(agents[index].get_visible_blocks()) - set(indexVisBlocks)
+                                            dLinkBlocks = set(agents[index].get_linked_blocks()) - set(indexLinkedBlocks)
+
+                                            #blocks, no pruned blocks
+                                            unionVisBlockSize =     len(agents[index].get_visible_blocks())
+                                            unionLinkedBlockSize =  len(agents[index].get_linked_blocks())
+
+
+                                            ##TimeDifference of intersections
+                                            tVisTxs = [time - t.arrival_time for t in dVisTxs]
+                                            tSubTxs = [time - t.arrival_time for t in dSubTxs]
+                                            tConTxs = [time - t.arrival_time for t in dConTxs]
+
+                                            tVisBlocks =  [time - t.creation_time for t in dVisBlocks]
+                                            tLinkBlocks = [time - t.creation_time for t in dLinkBlocks]
+                                            #print(agents[index].get_confirmed_transactions())
+
+
+
+                                            if 0<agents[index].p2pTime[i]<=1:
+
+                                                ##Don't need for now
+                                                #agents[index].recordP2P(time, unionVisTxSize, len(dVisTxs), tVisTxs, unionSubmittedTxSize, len(dSubTxs), tSubTxs, unionConfirmedTxSize, len(dConTxs), tConTxs, unionVisBlockSize, len(dVisBlocks), tVisBlocks, unionLinkedBlockSize, len(dLinkBlocks), tLinkBlocks, len(uTxs), len(dTxs), tTxs, len(uBlocks), len(dBlocks), tBlocks )
+
+                                                ##save txTransfer Data
+                                                if index==0:
+                                                    indexUtxs = len(indexVisibleTxs) + len(indexSubmittedTxs) + len(indexConfirmedTxs)
+                                                #    iUtxs = len(iVisibleTxs) + len(iSubmittedTxs) + len(iConfirmedTxs)
+                                                    indexUtxs2 = []
+                                                    for tx in indexVisibleTxs + indexSubmittedTxs + indexConfirmedTxs:
+                                                        if (time-tx.arrival_time)<self.prefilterTime:
+                                                            indexUtxs2.append(tx)
+                                                    for tx in indexUtxs2:
+                                                        #agents[index].txTrade.append([time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+                                                        agents[index].txTrade.append(['tx',time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+
+                                                    indexUBlocks = indexVisBlocks + indexLinkedBlocks
+                                                    for block in indexUBlocks:
+                                                        agents[index].txTrade.append(['block',time, len(indexUBlocks), block.id, block.creators, block.creation_time, time-block.creation_time, i, block in dBlocks])
+
+
+                            elif self.p2p and agents[index].p2pTime[i]>0: ##end of p2p interaction, cap p2pTime and add to p2pHistory
+                                endTime = self.inRange(agents[index],agents[i])
+                                #print([time, i, agents[index].p2pTime[i] + endTime])
+                                agents[index].p2pHistory.append([time, index, i, agents[index].p2pTime[i] + endTime])
+                                agents[index].p2pTime[i]=0
 
 
                 ##localBlock necessity
@@ -1102,7 +1306,9 @@ class Multi_Agent_Simulation:
                         else:
 
                             if len(txs)>self.maxTxs:
-                                txs=sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id)[:self.maxTxs]
+                                txs=sorted(agents[index].get_visible_transactions(), key=lambda x: x.id)[:self.maxTxs]
+                            elif len(txs)<self.minTxs:
+                                break
                                 #txs=txs[:self.maxTxs]
                             self.nearbyCounter += 1
                             #print("\nNEAR CONSENSUS: ",neighborsCount," ~ ",neighbors,"   TOT: ",self.nearbyCounter)
@@ -1221,6 +1427,8 @@ class Multi_Agent_Simulation:
 
                                     if len(txs)>self.maxTxs:
                                         txs=sorted(mintingAgent.get_visible_transactions(), key=lambda x: x.id)[:self.maxTxs]
+                                    elif len(txs)<self.minTxs:
+                                        break
                                         #txs=txs[:self.maxTxs]
 
                                     ##get blocks to link SHOULD BE ONLY 1 element in submited_blocks
@@ -1382,6 +1590,8 @@ class Multi_Agent_Simulation:
 
                                         if len(validatedTxs)>self.maxTxs:
                                             validatedTxs=sorted(validatedTxs, key=lambda x: x.id)[:self.maxTxs]
+                                        elif len(validatedTxs)<self.minTxs:
+                                            break
                                             #validatedTxs=validatedTxs[:self.maxTxs]
 
 
@@ -1440,7 +1650,8 @@ class Multi_Agent_Simulation:
 
     ## Transfer txs and blocks within radius between agents and bsus
     def transfer_bsu(self, agents, bsus, time):
-        keepTime=100 #TODO MAKE BETTER NUMBER LATER
+        keepTime=self.keep
+        #keepTime=100 #TODO MAKE BETTER NUMBER LATER
         radius=agents[0].radius #save radius in agent variables
 
         for agent in agents:
