@@ -500,7 +500,7 @@ def p2p_export(self,file_name1,file_name2):
     with open(file_name2, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
-        headers = ['time,','selfagentid', 'agentid','p2pTime']
+        headers = ['time','selfagentid', 'agentid','p2pTime']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
 

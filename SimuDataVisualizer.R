@@ -8,7 +8,8 @@ library(reshape2)
 
 
 ##upload csv as simuData
-simuData=blocks5000 
+
+simuData=test2
 #simuData=dhtTest
 
 
@@ -33,18 +34,22 @@ plot(simuData$ID, simuData$adoption_rate, col=simuData$singleAgent, pch=16)
 agentSeen = grepl("agent_", names(simuData)) #index for 
 simuData$count = numAgents-rowSums(is.na(simuData[agentSeen])) #count how many found it
 plot(simuData$ID, simuData$count, col=simuData$singleAgent, pch=16)
-
+print(mean(simuData$count))
 ##time to share blocks:
 agentSeen = grepl("agent_", names(simuData)) #index for 
 agentSeendf = data.frame(simuData[agentSeen])[-1,]
+agentSeendf = data.frame(simuData[agentSeen])[2:200,]
 shareTimes = apply(agentSeendf, 1, FUN = max)  - apply(agentSeendf, 1, FUN = min)
-
+print(max(shareTimes,na.rm=TRUE))
 shareTimesMedian = apply(agentSeendf, 1, FUN = median)  - apply(agentSeendf, 1, FUN = min)
+hist(shareTimes,200)
+(sum(sTimes,na.rm=TRUE) + sum(is.na(sTimes))*max(shareTimes,na.rm=TRUE))/(199*100)
 
-sTimes = apply(agentSeendf, 1, function(x){x-min(x)})
+
+sTimes = apply(agentSeendf, 1, function(x){x-min(x, na.rm=TRUE)})
 sTimes2=data.frame(x=unlist(sTimes))
-hist(sTimes,60, main = "Network Gossip Times", xlab="Time to Reach New Agent since Creation")
-
+hist(sTimes,1000,xlim=c(0,10000), main = "Network Gossip Times", xlab="Time to Reach New Agent since Creation")
+#hist(sTimesBroke,60, main = "Network Gossip Times", xlab="Time to Reach New Agent since Creation")
 
 simuData$maxShareTime = c(0,shareTimes)
 d <- density(simuData$maxShareTime, na.rm=TRUE)
@@ -1728,7 +1733,7 @@ for (i in 1:nrow(hashFrame)){
   hashFrame$daysPerCollisison[i] = hashFrame$hoursPerCollisison[i]/24
   hashFrame$txSizesScale[i] = hashFrame$txSize[i]/868
   hashFrame$blockSizesScale[i] = hashFrame$blockSize[i]/624
-  
+  hashFrame$bdayCollision[i] = hashFrame$numTrials[i]/hashFrame$hashperSecond
   }
 
 
@@ -2244,25 +2249,29 @@ hist(pf500Unique$numTxs, 100, main="PreFilter 500")
 
 file_list = list.files(pattern="*.csv")
 blockFiles  = c()
+p2pFiles = c()
 for (i in seq_along(file_list)) {
   #print(file_list[i])
   if (grepl("INTERACTION", file_list[i],fixed = TRUE)){
   
   }
   else if (grepl("P2P", file_list[i],fixed = TRUE)){}
-  else if (grepl("TXFILTER", file_list[i],fixed = TRUE)){}  
+  else if (grepl("TXFILTER", file_list[i],fixed = TRUE)){
+    p2pFiles = c(p2pFiles, file_list[i])
+  }  
   else {blockFiles = c(blockFiles, file_list[i])}
 }
 
 #data_list <- vector("list", "length" = length(file_list))
-preFilterDF <- data.frame(matrix(ncol = 6, nrow = length(blockFiles)))
-colnames(preFilterDF) <- c("PreFilter", "totnumConTxs", "meanConTime","uniqueTxs","expectedConfirmation", "orphanageRate")
+preFilterDF <- data.frame(matrix(ncol = 10, nrow = length(blockFiles)))
+colnames(preFilterDF) <- c("PreFilter", "totnumConTxs", "meanConTime","uniqueTxs","expectedConfirmation", "orphanageRate", "BlockFilter","fp","latency", "totLatency")
 
 #loop through all files
 for (i in seq_along(blockFiles)) {
-  #print(i/nrow(blockFiles))
+  print(i/length(blockFiles))
   filename = blockFiles[i]
-  print(filename)
+  #print(filename)
+  
   ## Read data in
   #simuData <- read.csv(filename, header = TRUE)
   simuData <- read.csv(filename)
@@ -2272,8 +2281,9 @@ for (i in seq_along(blockFiles)) {
   ##add to listblockConfirmationTime-txCreationTime
   #confirmedBlocks = simuData[simuData$confirmedBlock=="True",] #Sometimes "TRUE"
   confirmedBlocks = simuData[simuData$confirmedBlock=="True",] #Sometimes "TRUE"
+  confirmedBlocks=confirmedBlocks[1:(nrow(confirmedBlocks)/2),]
   for (j in 1:nrow(confirmedBlocks)){
-    #print(confirmedBlocks$ID[i])
+    #print(confirmedBlocks$ID[j])
     tx_creation_time = strsplit(confirmedBlocks$transaction_creation_time[j], ",")[[1]] #returns 1, 2 3
     #print(tx_creation_time)
     ###tx_creation_time is list of strings
@@ -2284,14 +2294,7 @@ for (i in seq_along(blockFiles)) {
       #txConfirmationTime = c( txConfirmationTime, confirmedBlocks$confirmationTime - strtoi(tct) )
     } 
   }
-  
-  ###temp two histograms
-  #hist(txConfirmationTime5000,100,main="Filter Cutoffs",xlim=c(0,3500),col=rgb(0,0,1,0.5), xlab="Transaction Confirmation Time")
-  #hist(txConfirmationTime100,411,main="100 Filter Cutoff",xlim=c(0,3500), col=rgb(1,0,0,0.5),add=T)
-  #hist(txConfirmationTime1000,200,main="1000 Filter Cutoff",xlim=c(0,3500), col=rgb(0,1,0,0.5),add=T)
-  #legend("topright",title="Cutoff Time",c("5000 ", "1000", "100"), fill=c(rgb(0,0,1,0.5),rgb(0,1,0,0.6),rgb(1,0,0,0.6), lwd=10),)
-  
-  ##get unique txs
+    ##get unique txs
   uniquetxs=c()
   for (j in 1:nrow(confirmedBlocks)){
     txs = strsplit(confirmedBlocks$block_transactions[j], ",")[[1]] #returns 1, 2 3
@@ -2309,14 +2312,28 @@ for (i in seq_along(blockFiles)) {
   #preFilter=strsplit(gsub("_", " ",filename), " +")[[1]]
   preFilter=strsplit(gsub("_", " ",filename), " +")[[1]][2]
   
-  if (grepl(".csv",preFilter,fixed="True")){
-    preFilterDF$PreFilter[i] = strtoi(substr(preFilter,1,nchar(preFilter)-4))
-    
-  }
-  if (grepl(".csv",preFilter,fixed="TRUE")){
-    preFilterDF$PreFilter[i] = strtoi(substr(preFilter,1,nchar(preFilter)-4))
-    
-  } 
+  #if (grepl(".csv",preFilter,fixed="True")){
+  #  preFilterDF$PreFilter[i] = strtoi(substr(preFilter,1,nchar(preFilter)-4))
+  #}
+  #else{
+    #preFilterDF$PreFilter[i] = strtoi(preFilter)
+  #}
+  preFilterDF$PreFilter[i] = strtoi(preFilter)
+  bt =strsplit(gsub("_", " ",filename), " +")[[1]][4]
+  
+  preFilterDF$BlockFilter[i] = strtoi(substr(bt,1,nchar(bt)-2))
+  
+  ##for false positive rate!!
+  pfDec=strsplit(gsub("_", " ",filename), " +")[[1]][6]
+  pfDec=substr(pfDec,1,nchar(pfDec)-4)
+  preFilterDF$fp[i] = as.numeric(pfDec)
+  
+  
+  ##get the latency
+  agentSeen = grepl("agent_", names(simuData)) #index for 
+  agentSeendf = data.frame(simuData[agentSeen])[2:200,]
+  sTimes = apply(agentSeendf, 1, function(x){x-min(x, na.rm=TRUE)})
+  preFilterDF$latency[i]=(sum(sTimes,na.rm=TRUE) + sum(is.na(sTimes))*max(sTimes,na.rm=TRUE))/(199*100)
   
   ##Expected Confirmation Time
   
@@ -2324,28 +2341,31 @@ for (i in seq_along(blockFiles)) {
   reSubmitTime = mean(txConfirmationTime, na.rm=TRUE) + sd(txConfirmationTime, na.rm=TRUE)*2
   preFilterDF$expectedConfirmation[i] = 0
   meanTime = mean(txConfirmationTime, na.rm=TRUE)
-  orphanRate = 1-preFilterDF$uniqueTxs[i]/19509
+  orphanRate = 1-preFilterDF$uniqueTxs[i]/(40000/2) #for 10000 txs
   ##orphanRate = sum(simuData$confirmedBlock=="False")/nrow(simuData)
   preFilterDF$orphanageRate[i]=orphanRate
-  for (n in 1:50){
+  for (n in 1:30){
     temp= sum( (meanTime+ reSubmitTime*(n-1)) * (1-orphanRate)*(orphanRate**(n-1) ))
     #print(temp)
     preFilterDF$expectedConfirmation[i] = preFilterDF$expectedConfirmation[i] + temp
   }
+  
+  preFilterDF$totLatency[i] = preFilterDF$expectedConfirmation[i] + preFilterDF$latency[i]
   
   
  
   
 
 ##plot h200
-h<-hist(txConfirmationTime, breaks=100)
-plot(h, main=preFilterDF$PreFilter[i])
-d <- density(txConfirmationTime, na.rm=TRUE)
+#h<-hist(txConfirmationTime, breaks=100)
+#plot(h, main=preFilterDF$PreFilter[i])
+#d <- density(txConfirmationTime, na.rm=TRUE)
 
-lines(x=d$x,y=d$y*length(txConfirmationTime)*(h$breaks[2] - h$breaks[1]), col="blue", lwd=2)
+#lines(x=d$x,y=d$y*length(txConfirmationTime)*(h$breaks[2] - h$breaks[1]), col="blue", lwd=2)
 
 
-preFilterDF$ConfirmationDistribution[i]= list(d)
+#preFilterDF$ConfirmationDistribution[i]= list(d)
+#preFilterDF$latencyDistribution[i] = list(sTimes)
 preFilterDF$totnumConTxs[i] = length(txConfirmationTime) ##count unique later
 
 
@@ -2358,9 +2378,30 @@ for (i in seq_along(preFilterDF)){
   lines(preFilterDF$ConfirmationDistribution[[i]]$x,preFilterDF$ConfirmationDistribution[[i]]$y*preFilterDF$totnumConTxs[i],col=colorLists[i])
 }
 
+library(ggplot2)
+f <- y ~ poly(x,5, raw=TRUE)
+ggplot(preFilterDF, aes(x=fp, y=expectedConfirmation))+
+  geom_point(position="dodge", stat="identity", size=4) + 
+  geom_smooth(lwd=3, se=FALSE) +
+  ggtitle("Highway, 100 Agents, Bloom Filter False Postive Rate ~ ECT") +
+  xlab("Bloom Filter False Positive Rate") + ylab("Expected Confirmation Time") + 
+  theme(plot.title = element_text(size=22))
+ # stat_regline_equation(label.x = 0.1, label.y = 5000)
+
+
+library(ggplot2)
+ggplot(preFilterDF, aes(x=fp, y=expectedConfirmation/min(expectedConfirmation)))+
+  geom_point(position="dodge", stat="identity", size=4) + 
+  geom_smooth(lwd=3) +
+  ggtitle("Highway, 100 Agents, Bloom Filter False Postive Rate ~ ECT") +
+  xlab("Bloom Filter False Positive Rate") + ylab("Expected Confirmation Time") + 
+  theme(plot.title = element_text(size=22))
 
 pf = preFilterDF[preFilterDF$PreFilter<5000,]
 plot(pf$PreFilter,pf$expectedConfirmation,lwd=10,main="Filter Cutoff & Expected Confirmation Time")
+plot(pf$PreFilter,pf$expectedConfirmation,lwd=10,main="Filter Cutoff & Expected Confirmation Time")
+
+plot(pf$PreFilter,pf$expectedConfirmation,type="l", lwd=4,main="Filter Cutoff & Expected Confirmation Time, Blocks Only", ylab="Expected Confirmation Time", xlab="Filter Cutoff (Sec)")
 #plot(pf$PreFilter,pf$totnumConTxs)
 #plot(pf$PreFilter,pf$uniqueTxs)
 #plot(pf$PreFilter,pf$orphanageRate)
@@ -2402,4 +2443,466 @@ for (j in 1:nrow(simuData)){
     blockTime = append( blockTime, strtoi(strtoi(b)) )
     #txConfirmationTime = c( txConfirmationTime, confirmedBlocks$confirmationTime - strtoi(tct) )
   } 
+}
+
+
+for (i in seq_along(blockFiles)){ 
+  preFilter=strsplit(gsub("_", " ",blockFiles[i]), " +")[[1]][2]
+  
+  if (grepl(".csv",preFilter,fixed="True")){
+    preFilterDF$PreFilter[i] = strtoi(substr(preFilter,1,nchar(preFilter)-4))
+  }
+    else{
+      preFilterDF$PreFilter[i] = strtoi(preFilter)
+    }
+}
+
+for (i in seq_along(blockFiles)){ 
+  #print(blockFiles[i])
+  blockFilter=strsplit(gsub("_", " ",blockFiles[i]), " +")[[1]][4]
+  if (grepl(".csv",blockFilter,fixed="True")){
+    preFilterDF$BlockFilter[i] = strtoi(substr(blockFilter,1,nchar(blockFilter)-4))
+    }
+  
+}
+
+
+
+pf = preFilterDF[preFilterDF$PreFilter<=2000,]
+pf = pf[pf$BlockFilter<=2000,]
+
+freq <- matrix( c(52.55773339,52.4810681,52.31722167,52.10666244,51.85152692,51.55303103,51.24675264,50.95101158,50.68197668,50.43064738,50.22846931,50.08543927,49.994372,49.93623365,49.93623365,49.95474748,50.020008,50.10406391,50.19520387,50.2870507,11.52907226,11.51214938,11.47624542,11.43321299,11.37467086,11.31150225,11.24373738,11.17828919,11.11804254,11.06485559,11.01959922,10.98659913,10.96551607,10.95785573,10.95472114,10.96099211,10.97318713,10.99220547,11.01079815,11.02951726,4.90118465,4.89277852,4.87879018,4.85866683,4.83424424,4.8066515,4.77798155,4.75203635,4.72511158,4.70191937,4.68361504,4.67039555,4.66098397,4.65570661,4.65570661,4.65882092,4.66314904,4.67240082,4.6797336,4.68703179,2.73969745,2.73613684,2.72762931,2.7166304,2.7027496,2.6875514,2.67207306,2.65649384,2.64181,2.62924142,2.61895192,2.61137649,2.60655494,2.60347547,2.60347547,2.60535233,2.60781839,2.61234295,2.61707225,2.62180777,1.78840879,1.78489564,1.7797031,1.77276685,1.76342337,1.75402455,1.74399484,1.73336661,1.72447279,1.71564231,1.70939685,1.7038622,1.70073726,1.6988028,1.6988028,1.69961249,1.70173829,1.7047733,1.70781914,1.71071479,1.28985419,1.28747029,1.28368926,1.27891973,1.27255435,1.26528502,1.25795304,1.25044504,1.24373112,1.2379787,1.23266801,1.22947598,1.22694364,1.22564332,1.22564332,1.22629314,1.22767628,1.22947598,1.2319294,1.23390357,0.99890991,0.9969349,0.99403376,0.98990311,0.98518794,0.97966981,0.97400602,0.96817904,0.9629888,0.95835985,0.95454662,0.95190337,0.94983488,0.94908041,0.94876476,0.94961552,0.95056832,0.95224781,0.95385465,0.95538447,0.81525917,0.81386686,0.81139444,0.80823488,0.80404819,0.79951033,0.79493013,0.79021474,0.78622136,0.78225906,0.77937373,0.77680709,0.77545595,0.77456974,0.77434183,0.77489849,0.77594474,0.77721495,0.77849226,0.77980458,0.69323956,0.69189474,0.69001949,0.68717958,0.68365041,0.67987454,0.67579296,0.67196405,0.66836977,0.66510667,0.66258759,0.66043484,0.6591803,0.65849162,0.65849162,0.65885797,0.65963519,0.66075872,0.66190098,0.6630472,0.6086962,0.60762395,0.60600669,0.60344773,0.60050042,0.59712626,0.59348405,0.59019735,0.58684333,0.58408302,0.58172941,0.58005317,0.57895527,0.57842395,0.57817575,0.57867237,0.57927387,0.58033743,0.58128325,0.58219843),nrow=10,ncol=20)
+freq2 <- matrix(c(0.54851987,0.54766937,0.5459702,0.54375649,0.54093532,0.53802293,0.53494464,0.53187436,0.52896294,0.52646198,0.52435606,0.52281311,0.52157284,0.52106858,0.52106858,0.52132058,0.52202189,0.52281311,0.52379486,0.52475492,0.5048295,0.5039379,0.50229659,0.50027297,0.497864,0.49496823,0.49219442,0.48927935,0.4866184,0.4843179,0.482411,0.48109686,0.48008502,0.47961592,0.47942176,0.47971962,0.48045098,0.48109686,0.48198218,0.48289125,0.47235861,0.47148872,0.47012833,0.46822716,0.46585552,0.46325103,0.46058238,0.45785409,0.45538011,0.45325877,0.45146018,0.45008397,0.4492363,0.44876516,0.44876516,0.44897784,0.44949506,0.4502979,0.45100349,0.45180931,0.44806656,0.4471529,0.44586017,0.44404929,0.44188451,0.43937562,0.4368033,0.4343326,0.4320046,0.42986732,0.42814069,0.42689383,0.42599487,0.42557269,0.42548668,0.42586023,0.42638349,0.42710527,0.42784126,0.42859559,0.42939911,0.42873197,0.42740367,0.42572568,0.42347464,0.42121565,0.41864654,0.41623261,0.41404033,0.41201794,0.4103554,0.40921444,0.40829659,0.40798516,0.40786166,0.40820489,0.40873244,0.40933876,0.41007412,0.4108327,0.41480007,0.4142238,0.41298141,0.41125155,0.40921444,0.40691806,0.40454606,0.40220968,0.40008444,0.39806768,0.39654096,0.39537183,0.39452055,0.39417174,0.39403881,0.39435632,0.39480955,0.3955169,0.39624941,0.39679568,0.40320251,0.40248992,0.40137764,0.3996568,0.39774416,0.3955169,0.39316686,0.39083263,0.38869389,0.38694127,0.38545323,0.38426319,0.38350541,0.38307775,0.38307775,0.38321394,0.38380617,0.38440022,0.38507073,0.38566871,0.39342197,0.39271922,0.39159611,0.3899818,0.38800827,0.38588444,0.38359275,0.38133106,0.37924175,0.37751086,0.37590355,0.37487529,0.37412251,0.37379817,0.37361391,0.37396027,0.37441129,0.37494205,0.37555358,0.37625418,0.38453735,0.38401981,0.38283588,0.38133106,0.37940861,0.37724461,0.37510515,0.37282519,0.37089542,0.36914938,0.36761235,0.36651541,0.36575363,0.36537528,0.36537528,0.36559857,0.36608557,0.36669274,0.36723014,0.36794767,0.37635928,0.37573976,0.37465246,0.37317009,0.37124711,0.36914938,0.36700487,0.36484329,0.36291902,0.36109526,0.35975516,0.35869104,0.35795307,0.35758199,0.35758199,0.35773389,0.3582407,0.35869104,0.35947532,0.36002217), nrow=10, ncol=20)
+freqTotal=rbind(freq,freq2)
+
+
+freqTest=rbind(c(52.55773339,52.4810681,52.31722167,52.10666244,51.85152692,51.55303103
+                 ,51.24675264,50.95101158,50.68197668,50.43064738,50.22846931,50.08543927
+                 ,49.994372,49.93623365,49.93623365,49.95474748,50.020008,50.10406391
+                 ,50.19520387,50.2870507))
+
+freqTest=rbind(freqTest,c(11.52907226,11.51214938,11.47624542,11.43321299,11.37467086,11.31150225
+                          ,11.24373738,11.17828919,11.11804254,11.06485559,11.01959922,10.98659913
+                          ,10.96551607,10.95785573,10.95472114,10.96099211,10.97318713,10.99220547
+                          ,11.01079815,11.02951726))
+
+freqTest=rbind(freqTest,c(4.90118465,4.89277852,4.87879018,4.85866683,4.83424424,4.8066515
+                          ,4.77798155,4.75203635,4.72511158,4.70191937,4.68361504,4.67039555
+                          ,4.66098397,4.65570661,4.65570661,4.65882092,4.66314904,4.67240082
+                          ,4.6797336,4.68703179))
+
+freqTest=rbind(freqTest,c(2.73969745,2.73613684,2.72762931,2.7166304,2.7027496,2.6875514
+                          ,2.67207306,2.65649384,2.64181,2.62924142,2.61895192,2.61137649
+                          ,2.60655494,2.60347547,2.60347547,2.60535233,2.60781839,2.61234295
+                          ,2.61707225,2.62180777))
+freqTest=rbind(freqTest,c(1.78840879,1.78489564,1.7797031,1.77276685,1.76342337,1.75402455
+                          ,1.74399484,1.73336661,1.72447279,1.71564231,1.70939685,1.7038622
+                          ,1.70073726,1.6988028,1.6988028,1.69961249,1.70173829,1.7047733
+                          ,1.70781914,1.71071479))
+freqTest=rbind(freqTest,c(1.28985419,1.28747029,1.28368926,1.27891973,1.27255435,1.26528502
+                          ,1.25795304,1.25044504,1.24373112,1.2379787,1.23266801,1.22947598
+                          ,1.22694364,1.22564332,1.22564332,1.22629314,1.22767628,1.22947598
+                          ,1.2319294,1.23390357))
+freqTest=rbind(freqTest,c(0.99890991,0.9969349,0.99403376,0.98990311,0.98518794,0.97966981
+                          ,0.97400602,0.96817904,0.9629888,0.95835985,0.95454662,0.95190337
+                          ,0.94983488,0.94908041,0.94876476,0.94961552,0.95056832,0.95224781
+                          ,0.95385465,0.95538447))
+freqTest=rbind(freqTest,c(0.81525917,0.81386686,0.81139444,0.80823488,0.80404819,0.79951033
+                          ,0.79493013,0.79021474,0.78622136,0.78225906,0.77937373,0.77680709
+                          ,0.77545595,0.77456974,0.77434183,0.77489849,0.77594474,0.77721495
+                          ,0.77849226,0.77980458))
+freqTest=rbind(freqTest,c(0.69323956,0.69189474,0.69001949,0.68717958,0.68365041,0.67987454
+                          ,0.67579296,0.67196405,0.66836977,0.66510667,0.66258759,0.66043484
+                          ,0.6591803,0.65849162,0.65849162,0.65885797,0.65963519,0.66075872
+                          ,0.66190098,0.6630472))
+freqTest=rbind(freqTest,c(0.6086962,0.60762395,0.60600669,0.60344773,0.60050042,0.59712626
+                          ,0.59348405,0.59019735,0.58684333,0.58408302,0.58172941,0.58005317
+                          ,0.57895527,0.57842395,0.57817575,0.57867237,0.57927387,0.58033743
+                          ,0.58128325,0.58219843))
+
+freqTest=rbind(freqTest,c(0.54851987,0.54766937,0.5459702,0.54375649,0.54093532,0.53802293
+                          ,0.53494464,0.53187436,0.52896294,0.52646198,0.52435606,0.52281311
+                          ,0.52157284,0.52106858,0.52106858,0.52132058,0.52202189,0.52281311
+                          ,0.52379486,0.52475492))
+freqTest=rbind(freqTest,c(0.5048295,0.5039379,0.50229659,0.50027297,0.497864,0.49496823
+                          ,0.49219442,0.48927935,0.4866184,0.4843179,0.482411,0.48109686
+                          ,0.48008502,0.47961592,0.47942176,0.47971962,0.48045098,0.48109686
+                          ,0.48198218,0.48289125))
+freqTest=rbind(freqTest,c(0.47235861,0.47148872,0.47012833,0.46822716,0.46585552,0.46325103
+                          ,0.46058238,0.45785409,0.45538011,0.45325877,0.45146018,0.45008397
+                          ,0.4492363,0.44876516,0.44876516,0.44897784,0.44949506,0.4502979
+                          ,0.45100349,0.45180931))
+freqTest=rbind(freqTest,c(0.44806656,0.4471529,0.44586017,0.44404929,0.44188451,0.43937562
+                          ,0.4368033,0.4343326,0.4320046,0.42986732,0.42814069,0.42689383
+                          ,0.42599487,0.42557269,0.42548668,0.42586023,0.42638349,0.42710527
+                          ,0.42784126,0.42859559))
+freqTest=rbind(freqTest,c(0.42939911,0.42873197,0.42740367,0.42572568,0.42347464,0.42121565
+                          ,0.41864654,0.41623261,0.41404033,0.41201794,0.4103554,0.40921444
+                          ,0.40829659,0.40798516,0.40786166,0.40820489,0.40873244,0.40933876
+                          ,0.41007412,0.4108327))
+freqTest=rbind(freqTest,c(0.41480007,0.4142238,0.41298141,0.41125155,0.40921444,0.40691806
+                 ,0.40454606,0.40220968,0.40008444,0.39806768,0.39654096,0.39537183
+                 ,0.39452055,0.39417174,0.39403881,0.39435632,0.39480955,0.3955169
+                 ,0.39624941,0.39679568))
+
+freqTest=rbind(freqTest,c(0.40320251,0.40248992,0.40137764,0.3996568,0.39774416,0.3955169
+                 ,0.39316686,0.39083263,0.38869389,0.38694127,0.38545323,0.38426319
+                 ,0.38350541,0.38307775,0.38307775,0.38321394,0.38380617,0.38440022
+                 ,0.38507073,0.38566871))
+freqTest=rbind(freqTest,c(0.39342197,0.39271922,0.39159611,0.3899818,0.38800827,0.38588444
+                 ,0.38359275,0.38133106,0.37924175,0.37751086,0.37590355,0.37487529
+                 ,0.37412251,0.37379817,0.37361391,0.37396027,0.37441129,0.37494205
+                 ,0.37555358,0.37625418))
+freqTest=rbind(freqTest,c(0.38453735,0.38401981,0.38283588,0.38133106,0.37940861,0.37724461
+                 ,0.37510515,0.37282519,0.37089542,0.36914938,0.36761235,0.36651541
+                 ,0.36575363,0.36537528,0.36537528,0.36559857,0.36608557,0.36669274
+                 ,0.36723014,0.36794767))
+freqTest=rbind(freqTest,c(0.37635928,0.37573976,0.37465246,0.37317009,0.37124711,0.36914938
+                 ,0.36700487,0.36484329,0.36291902,0.36109526,0.35975516,0.35869104
+                 ,0.35795307,0.35758199,0.35758199,0.35773389,0.3582407,0.35869104
+                 ,0.35947532,0.36002217))
+
+##turn into long dataframe
+freqDF <- data.frame(matrix(ncol = 3, nrow = 200))
+colnames(freqDF) <- c("PreFilter", "BlockFilter", "lt")
+for (i in 1:20){
+  for (j in 1:20){
+    freqDF[(i-1)*20 + j,] = c(i*100,j*100, freqTest[i,j])
+  }
+}
+
+
+library(ggplot2)
+library(ggpubr)
+ggplot(freqDF, aes(x=BlockFilter, y=as.numeric(PreFilter), fill=lt)) + 
+  geom_tile() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway 100 Agents, Transaction Throughput ~ Cutoffs") +
+  xlab("Block Filter Cutoff") + ylab("Transaction Filter Cutoff") +
+  labs(fill="Transactions/Sec") + 
+  theme(plot.title = element_text(size=26))
+
+
+library(ggplot2)
+library(ggpubr)
+ggplot(pf, aes(x=BlockFilter, y=as.numeric(PreFilter), fill=expectedConfirmation)) + 
+  geom_tile() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Downtown 100 Agents, Combine Filter Results ~ ECT") +
+  xlab("Block Filter Cutoff") + ylab("Transaction Filter Cutoff") +
+  labs(fill="ECT") + 
+   theme(plot.title = element_text(size=26))
+
+##plot tCutoff/PreFilter VS. false positive rate (P)
+ggplot(preFilterDF, aes(x=as.numeric(PreFilter), y=fp, fill=fp)) + 
+  geom_tile() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Bloom Filter False Positive Rate") + ylab("Transaction Filter Cutoff") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+ggplot(test, aes(x=PreFilter, y=expectedConfirmation, group=fp, color=fp)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Expected Confirmation Time") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+ggplot(test, aes(x=fp, y=expectedConfirmation, group=PreFilter, color=PreFilter)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Expected Confirmation Time") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+preFilterDF$fp2 =as.integer(preFilterDF$fp*100)
+
+  ##add MaximumTxsHwy100 to each row of preFilterDF (20x50)
+for (i in 1:nrow(preFilterDF)){ ##160 obs of 9 variables
+  print(i)
+  #print(preFilterDF$PreFilter[i]/100)
+  #print(preFilterDF$fp[i]/0.01)
+  preFilterDF$throughput[i] = MaximumTxsHwy100[preFilterDF$PreFilter[i]/100,  preFilterDF$fp2[i]][[1]]
+  preFilterDF$throughputETC[i] = preFilterDF$expectedConfirmation[i]*preFilterDF$throughput[i][[1]]
+  preFilterDF$throughputtotLat[i] = preFilterDF$totLatency[i]*preFilterDF$throughput[i][[1]]
+}
+
+ggplot(preFilterDF, aes(x=fp, y=throughputETC, group=PreFilter, color=PreFilter)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ Maximum Confirmation Throughput") +
+  xlab("Transaction Filter Cutoff") + ylab("throughputETC") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+
+ggplot(preFilterDF, aes(x=PreFilter, y=throughputETC, group=fp, color=fp)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ Maximum Confirmation Throughput") +
+  xlab("Transaction Filter Cutoff") + ylab("throughputETC") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+ggplot(preFilterDF, aes(x=PreFilter, y=as.numeric(latency), group=fp, color=fp)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Network Latency") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+ggplot(preFilterDF, aes(x=fp, y=as.numeric(latency), group=PreFilter, color=PreFilter)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Network Latency") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+
+ggplot(preFilterDF, aes(x=PreFilter, y=as.numeric(throughputtotLat), group=fp, color=fp)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Tx Confirmation Latency") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+ggplot(preFilterDF, aes(x=fp, y=as.numeric(throughputtotLat), group=PreFilter, color=PreFilter)) + 
+  geom_line() + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
+  xlab("Transaction Filter Cutoff") + ylab("Tx Confirmation Latency") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))
+
+
+
+ggplot(refDataDownTown2refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 
+  geom_point(position="dodge", stat="identity") +
+  geom_label_repel(aes(label = group),box.padding   = 0.35, point.padding = 0.5,segment.color = 'grey50')+
+  ggtitle(paste("Downtown 2 Refs, Minting Time ~ ")) +
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9)) + 
+  xlab("Block Minting Time") + ylab("Expected Transaction Confirmation Time") +
+  scale_x_continuous(breaks = pretty(refData$blockTime, n = length(unique(refData$blockTime)))) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ylim(0,200)+
+  geom_smooth(se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.8)
+
+
+## get filter size and success rate
+file_list = list.files(pattern="*.csv")
+blockFiles  = c()
+p2pFiles = c()
+for (i in seq_along(file_list)) {
+  #print(file_list[i])
+  if (grepl("INTERACTION", file_list[i],fixed = TRUE)){
+    
+  }
+  else if (grepl("P2P", file_list[i],fixed = TRUE)){}
+  else if (grepl("TXFILTER", file_list[i],fixed = TRUE)){
+    p2pFiles = c(p2pFiles, file_list[i])
+  }  
+  else {blockFiles = c(blockFiles, file_list[i])}
+}
+
+#data_list <- vector("list", "length" = length(file_list))
+p2pDF <- data.frame(matrix(ncol = 4, nrow = length(p2pFiles)))
+colnames(p2pDF) <- c("PreFilter", "BlockFilter", "BlockRate", "TxRate")
+
+
+for (i in seq_along(p2pFiles)){ 
+  
+  
+  filename = p2pFiles[i]
+  #print(filename)
+  print(i/length(p2pFiles)) ##what percantage are we?
+  ## Read data in
+  #simuData <- read.csv(filename, header = TRUE)
+  simuData <- read.csv(filename)
+
+  #print(blockFiles[i])
+  blockFilter=strsplit(gsub("_", " ",filename), " +")[[1]][4]
+  if (grepl(".csv",blockFilter,fixed="True")){
+    p2pDF$BlockFilter[i] = strtoi(substr(blockFilter,1,nchar(blockFilter)-4))
+  }else{
+    p2pDF$BlockFilter[i] =strtoi(blockFilter)
+  }
+  p2pDF$PreFilter[i] =  strtoi(strsplit(gsub("_", " ",filename), " +")[[1]][2])
+  
+  simuDataTx = simuData[simuData$type=="tx",]
+  simuDataBlock = simuData[simuData$type=="block",]
+  
+  p2pDF$BlockRate[i] = sum(simuDataBlock$new=="True")/nrow(simuDataBlock)
+  p2pDF$TxRate[i] = sum(simuDataTx$new=="True")/nrow(simuDataTx)
+  
+}
+
+bf <- unique(p2pDF$BlockFilter)
+blockLM <- lm(p2pDF$BlockRate ~ poly(p2pDF$BlockFilter, 3))
+p <- predict(blockLM)
+
+plot(p2pDF$BlockFilter, p2pDF$BlockRate)
+ix <- sort(x,index.return=T)$ix
+lines(bf, p, col=2, lwd=2)
+
+fit <- lm(p2pDF$BlockRate ~ poly(p2pDF$BlockFilter, 2)) ##manually create model
+
+
+#f <- BlockRate ~ poly(BlockFilter,7,raw=TRUE)
+#f <- BlockRate ~ log
+f <- BlockRate ~ poly(1/BlockFilter,3,raw=TRUE)
+model <- lm(f,p2) ##p2 is just unique(p2pDF[c(blockFilter,BlockRate)])
+bFilter=seq(25,1500,25)
+bRate <- predict(model, data.frame(BlockFilter = bFilter))
+plot(p2$BlockFilter,p2$BlockRate,lwd=5,main="Inverse poly order 3")
+lines(bFilter, bRate, col="red",lwd=3)
+
+
+f = y ~ poly(1/x,3,raw=TRUE)
+ggplot(p2, aes(x=BlockFilter, y= BlockRate)) + 
+  geom_point(size=4) + 
+  ggtitle("Downtown, 100 Agents, Block Gossip Statistics") + xlab("Block Filter Cutoff") + ylab("Block Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_smooth(method = "lm", formula = f, se=FALSE,lwd=3) +
+  stat_regline_equation(label.x=500, aes(label =  paste(..eq.label.., sep = "~~~~")),formula = f) 
+
+
+f = y ~ poly(1/x,3,raw=TRUE)
+ggplot(p2pDF, aes(x=PreFilter, y= TxRate)) + 
+  geom_point(size=4) + 
+  ggtitle("Downtown, 100 Agents, Transaction Gossip Statistics") + xlab("Transaction Filter Cutoff") + ylab("Transaction Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_smooth(method = "lm", formula = f, se=FALSE,lwd=3) +
+  stat_regline_equation(label.x=500, aes(label =  paste(..eq.label.., sep = "~~~~")),formula = f) 
+
+
+library(ggplot2)
+library(ggpubr)
+f = y ~ poly(x,6,raw=TRUE)
+#f = y ~ ns(x,5)
+#f = y ~ bs(x, df=4, raw=TRUE)
+ggplot(p2pDF, aes(x=BlockFilter, y= BlockRate)) + 
+  geom_point(size=4) + 
+  ggtitle("Downtown, 100 Agents, Block Gossip Statistics") + xlab("Block Filter Cutoff") + ylab("Block Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_smooth(method = "lm", formula = f, se=FALSE,lwd=3) +
+  stat_regline_equation(label.x=250, aes(label =  paste(..eq.label.., sep = "~~~~")),formula = f) 
+
+
+
+ggplot(p2pDF, aes(x=BlockFilter, y= BlockRate)) + 
+  geom_point(size=4) + 
+  ggtitle("Downtown, 100 Agents, Block Gossip Statistics") + xlab("Block Filter Cutoff") + ylab("Block Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  geom_smooth(method = "lm", formula = f, se=FALSE,lwd=3) +
+  stat_poly_eq(parse=T, formula=f)
+
+#ggscatter(p2pDF, x="BlockFilter", y="BlockRate", add="reg.line")
+
+
+f = y ~ poly(x, 3, raw=TRUE)
+ggplot(p2pDF, aes(x=PreFilter, y= TxRate)) + 
+  geom_point(size=4) + 
+  ggtitle("Highway, 100 Agents, Transaction Gossip Statistics") + xlab("Transaction Filter Cutoff") + ylab("Transaction Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_smooth(method = "lm", formula = f, se=FALSE,lwd=3) +
+  stat_regline_equation(label.x=1000,
+                        aes(label =  paste(..eq.label.., sep = "~~~~")),
+                        formula = f
+  ) 
+
+##plot shareTimes with CDF
+par(mar = c(5,5,2,5))
+h <-hist(test2Min,100, main="Highway, 100 Agents, Novel Items Proliferation Latency", xlab="Item Latency")
+par(new = T)
+##plot shareTimes w/ CDF
+plot(x = h$mids, y=ec(h$mids)*max(h$counts), col = rgb(0,0,0,alpha=0), axes=F, xlab=NA, ylab=NA)
+lines(x = h$mids, y=ec(h$mids)*max(h$counts), col ='red', lwd=5)
+axis(4, at=seq(from = 0, to = max(h$counts), length.out = 11), labels=seq(0, 1, 0.1), col = 'red', col.axis = 'red')
+mtext(side = 4, line = 3, 'Cumulative Density', col = 'red')
+
+f = y ~ poly(x,3, raw=TRUE)
+
+ggplot( aes(x=300/(1:length(my.ecdf)), y= my.ecdf)) + 
+  geom_point(size=4) + 
+  ggtitle("Highway, 100 Agents, Transaction Gossip Statistics") + xlab("Transaction Filter Cutoff") + ylab("Transaction Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_regline_equation(label.x = 20, label.y = 0.5,formula = f) + 
+  geom_smooth(method = "lm", formula =f, lwd=3, se=FALSE)) + 
+  geom_point(size=4) + 
+  ggtitle("Highway, 100 Agents, Transaction Gossip Statistics") + xlab("Transaction Filter Cutoff") + ylab("Transaction Novelty Rate") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_regline_equation(label.x = 20, label.y = 0.5,formula = f) + 
+  geom_smooth(method = "lm", formula =f, lwd=3, se=FALSE)
+
+cdfEquation <- data.frame(matrix(ncol = 2, nrow = 3000))
+colnames(cdfEquation) <- c("x", "y")
+cdfEquation$x <- x
+cdfEquation$y <- ec(x)
+
+#f = y ~ bs(x,df=5)
+f = y ~ bs(x,df=5)
+f = y ~ poly(x,4,raw=TRUE)
+ggplot(cdfEquation, aes(x=x, y= y)) + 
+  geom_point(size=5) + 
+  ggtitle("Highway, 100 Agents, Item Novelty Penetration Distribution") + xlab("Time Latency") + ylab("Network Penetration %") +
+  theme(plot.title = element_text(size=22)) + 
+  stat_smooth( formula = f, se=FALSE,lwd=3, method = "lm") +
+  stat_regline_equation(label.x=1000, label.y=0.25, aes(label =  paste(..eq.label.., sep = "~~~~")), formula = f) 
+
+
+
+
+for (i in seq_along(blockFiles)){ 
+  
+  
+  filename = p2pFiles[i]
+  #print(filename)
+  print(i/length(p2pFiles)) ##what percantage are we?
+  ## Read data in
+  #simuData <- read.csv(filename, header = TRUE)
+  #simuData <- read.csv(filename)
+  
+  #print(blockFiles[i])
+  blockFilter=strsplit(gsub("_", " ",filename), " +")[[1]][4]
+  if (grepl(".csv",blockFilter,fixed="True")){
+    preFilterDF$BlockFilter[i] = strtoi(substr(blockFilter,1,nchar(blockFilter)-4))
+  }
+  else{
+    preFilterDF$BlockFilter[i] =strtoi(blockFilter)
+  }
+ 
+  
+}
+
+
+
+###just get blockID
+
+
+for (i in seq_along(blockFiles)){ 
+  
+  
+  filename = p2pFiles[i]
+  #print(filename)
+  print(i/length(p2pFiles)) ##what percantage are we?
+  ## Read data in
+  #simuData <- read.csv(filename, header = TRUE)
+  #simuData <- read.csv(filename)
+  
+  #print(blockFiles[i])
+  blockFilter=strsplit(gsub("_", " ",filename), " +")[[1]][4]
+  if (grepl(".csv",blockFilter,fixed="True")){
+    preFilterDF$BlockFilter[i] = strtoi(substr(blockFilter,1,nchar(blockFilter)-4))
+  }
+  else{
+    preFilterDF$BlockFilter[i] =strtoi(blockFilter)
+  }
+  
+  
 }

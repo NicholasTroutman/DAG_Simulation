@@ -22,7 +22,7 @@ netsize = 10
 lam = 1 ##frequency of tx minting
 lam_m = 1/40 #milestone rate
 prefilterTime = 6000 ##preFilter cutoff time, all sent txs must be newer than this
-
+blockfilterTime = 6000
 alpha = 0.01
 txs = 400
 printing=True
@@ -41,8 +41,9 @@ maxTxs=130
 minTxs=0
 keep=200
 p2p=0 #false, don't print p2p information
+falsePositive = 0
 
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu =", "pruning =", "balance =", "maxTxs =", "minTxs =", "keep =", "p2p =", "prefilterTime ="]
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu =", "pruning =", "balance =", "maxTxs =", "minTxs =", "keep =", "p2p =", "prefilterTime =", "blockfilterTime =", "falsePositive ="]
 opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbrgvrpbmmk:p:", commands)
 for opt, arg in opts:
     print(opt," = ",arg)
@@ -140,14 +141,29 @@ for opt, arg in opts:
             sys.exit("Keep INVALID")
     elif opt in ('-p', '--p2p '):
         if int(arg)==1 or arg==True or arg=="True":
-            p2p=int(arg)
+            p2p=1
+        elif int(arg)==0 or arg==False or arg=="False":
+            p2p=0
         else:
             sys.exit("P2P INVALID")
     elif opt in ('-p', '--prefilterTime '):
         if float(arg)>0:
             prefilterTime=int(arg)
+            blockfilterTime = prefilterTime*1.25 #hardcode for me after testing this is a solid value
+            #print(int(arg)*1.25)
         else:
             sys.exit("prefilterTime INVALID")
+    elif opt in ('-b', '--blockfilterTime '):
+        print("\nBLOCKFILTER TIME IS BEING USED\n")
+        if float(arg)>0:
+            blockfilterTime=int(arg)
+        else:
+            sys.exit("blockfilterTime INVALID")
+    elif opt in ('-f', '--falsePositive '):
+        if float(arg)>=0 and float(arg)<=1:
+            falsePositive=float(arg)
+        else:
+            sys.exit("falsePositive INVALID")
 
 
 
@@ -172,7 +188,8 @@ print("MinTxs: ",minTxs)
 print("KeepTime: ",keep)
 print("P2P: ",p2p)
 print("prefilterTime: ",prefilterTime)
-
+print("blockfilterTime: ",blockfilterTime)
+print("falsePositive: ",falsePositive)
 
 ##check for improper Group with near
 if consensus=="near" and group<2:
@@ -219,8 +236,11 @@ suffix = '.csv'
 
 #for lam in my_lambda:
 timestr = time.strftime("%Y%m%d-%H%M")
-base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_maxTxs_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_prefilterTime_{}' \
-            .format(timestr, DLTMode, consensus, txs, tsa, netsize, seed, inputMap, blockTime, references, group, basestations, pruning, balance, maxTxs, minTxs, keep, p2p, lam, prefilterTime)
+#base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_maxTxs_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_tCutoff_{}_bCutoff_{}_fp_{}' \
+#            .format(timestr, DLTMode, consensus, txs, tsa, netsize, seed, inputMap, blockTime, references, group, basestations, pruning, balance, maxTxs, minTxs, keep, p2p, lam, prefilterTime, blockfilterTime, falsePositive)
+base_name = '{}_{}_{}_txs_{}_size_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_tCutoff_{}_bCutoff_{}_fp_{}' \
+            .format(timestr, DLTMode, consensus, txs, netsize,  inputMap, blockTime, references, group, basestations, pruning, balance, minTxs, keep, p2p, lam, prefilterTime, blockfilterTime, falsePositive)
+
 simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                             _no_of_agents = netsize, _alpha = alpha,
                             _distance = 1, _tip_selection_algo = tsa,
@@ -228,7 +248,8 @@ simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                             _printing=printing, _lambda_m=lam_m, _seed=seed,
                              _DLTMode=DLTMode, _consensus=consensus, _importMap=inputMap, _blockTime=blockTime,
                               _references=references, _group=group, _volume = volume, _basestations = basestations,
-                               _pruning = pruning, _balance=balance, _maxTxs=maxTxs, _minTxs=minTxs,_keep=keep, _p2p=p2p, _prefilterTime=prefilterTime)
+                               _pruning = pruning, _balance=balance, _maxTxs=maxTxs, _minTxs=minTxs,_keep=keep, _p2p=p2p,
+                                _prefilterTime=prefilterTime, _blockfilterTime=blockfilterTime, _falsePositive= falsePositive)
 simu2.setup()
 simu2.run()
 
@@ -243,8 +264,8 @@ if p2p==1 or p2p==True:
     file_name1 = os.path.join(dir_name, base_name + "_P2P" + suffix)
     file_name2 = os.path.join(dir_name, base_name + "_INTERACTION" + suffix)
     file_name3 = os.path.join(dir_name, base_name + "_TXFILTER" + suffix)
-    p2p_export(simu2, file_name1, file_name2)
-    tx_export(simu2, file_name3)
+    p2p_export(simu2, file_name1, file_name2) ##Don't need right now, enable later
+    tx_export(simu2, file_name3) ##Don't need right now, enable later
 print("TOTAL simulation time: " + str(np.round(timeit.default_timer() - start_time, 3)) + " seconds\n")
 
 #############################################################################

@@ -31,9 +31,13 @@ class Multi_Agent_Simulation:
                  _seed = 1, _DLTMode = "linear", _consensus = "individual",  \
                  _importMap = "Error", _blockTime = 40, _references = 1, _group = 1, \
                  _volume = 0, _basestations = 0, _pruning = 0, _balance = 0, _maxTxs = 130, \
-                 _minTxs = 0, _keep = 100, _p2p=0, _prefilterTime=6000):
+                 _minTxs = 0, _keep = 100, _p2p=0, _prefilterTime=6000, _blockfilterTime=6000, \
+                 _falsePositive = 0):
 
         ##define
+        self.counter = 0
+        self.falsePositive = _falsePositive
+        self.blockfilterTime = _blockfilterTime
         self.prefilterTime=_prefilterTime
         self.p2p=_p2p
         self.keep = _keep
@@ -60,6 +64,20 @@ class Multi_Agent_Simulation:
 
         self.blockTime = _blockTime
         self.importMap = str(_importMap)+str(".jpg")
+        if "Hwy" in self.importMap:
+            self.reconcile = 42.36 #LoRaWAN
+            #self.reconcile = 2.23 #WiFi
+            #self.reconcile = 71.39 #Bluetooth
+            self.fullReconcile=110 ##hwy hardcoded
+            self.fullCeiling=2500
+        else:
+            self.reconcile = 71.39 #LoraWan
+            #self.reconcile = 5.68 #WiFi
+            #self.reconcile = 1.01 #Bluetooth
+        #self.reconcile2 = self.reconcile*3
+
+
+
         self.currentBlock = 0
         self.seed = _seed
         self.no_of_transactions = _no_of_transactions
@@ -138,6 +156,8 @@ class Multi_Agent_Simulation:
 
     def setup(self):
 
+        random.seed(self.seed)
+
         np.random.seed(self.seed)
         #Create agents
         agent_counter = 0
@@ -147,7 +167,8 @@ class Multi_Agent_Simulation:
             else:
                 self.agents.append(Agent(agent_counter,  self.importMap))
 
-            if (self.p2p):
+            #if (self.p2p):
+            if (True):
                 self.agents[agent_counter].p2pTime=[0 for _ in range(self.no_of_agents)] ##length of each p2pInteraction
             agent_counter += 1
 
@@ -187,10 +208,10 @@ class Multi_Agent_Simulation:
         #print(inter_arrival_times)
 
         self.arrival_times = list(np.cumsum(inter_arrival_times))
-
+        #print(self.arrival_times)
 
         maxArrivalTime = max(self.arrival_times)
-
+        #print(maxArrivalTime)
         #print("Transactions Created")
 
         #Createa random arrival times for self blocks in predetermined modes (indivdual + Blockchain)
@@ -1085,33 +1106,45 @@ class Multi_Agent_Simulation:
                                 neighbors.append(agents[i])
 
                                 #record p2pTime
-                                if (self.p2p):
+                                #if (self.p2p):
+                                if (True):
                                     #continuation
                                     if agents[index].p2pTime[i]>0: ##still in range add 1
                                         agents[index].p2pTime[i]=agents[index].p2pTime[i]+1 #increment 1
 
-                                        ##80/81 is hardcoded as a 10% threshold
-                                        if 80<=agents[index].p2pTime[i]>81: ##trade all other txs/blocks
+                                        #80/81 is hardcoded as a 10% threshold
+                                        if (self.fullReconcile)<=agents[index].p2pTime[i]<(self.fullReconcile+1): ##trade all other txs/blocks ##hwy number,
+                                            ##Send all blocks, with all submitted/confirmed txs, and subset of extremely old visTxs
 
-                                            indexVisBlocks = agents[index].get_visible_blocks().copy()
-                                            iVisBlocks = agents[i].get_visible_blocks()
+                                            #indexVisBlocks =    agents[index].get_visible_blocks().copy()
+                                            #iVisBlocks =        agents[i].get_visible_blocks().copy()
+                                            indexVisBlocks = [youngBlock for youngBlock in agents[index].get_visible_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
+                                            iVisBlocks =     [youngBlock for youngBlock in agents[i].get_visible_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
 
-                                            #indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
-                                            #iConfirmedBlocks =  agents[i].get_confirmed_blocks()
-                                            indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
-                                            iLinkedBlocks =  agents[i].get_linked_blocks()
+                                            #indexLinkedBlocks = agents[index].get_linked_blocks().copy()
+                                            #iLinkedBlocks =     agents[i].get_linked_blocks().copy()
+                                            indexLinkedBlocks = [youngBlock for youngBlock in agents[index].get_linked_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
+                                            iLinkedBlocks =     [youngBlock for youngBlock in agents[i].get_linked_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
+
 
                                             ##Trade txs
                                             #get txs
-                                            indexVisibleTxs = agents[index].get_visible_transactions().copy()
-                                            iVisibleTxs = agents[i].get_visible_transactions()
+                                            #indexVisibleTxs = agents[index].get_visible_transactions().copy()
+                                            #iVisibleTxs = agents[i].get_visible_transactions().copy()
+                                            indexVisibleTxs = [youngTx for youngTx in agents[index].get_visible_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
+                                            iVisibleTxs =     [youngTx for youngTx in agents[i].get_visible_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
 
 
-                                            indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
-                                            iSubmittedTxs = agents[i].get_submitted_transactions()
+                                            #indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
+                                            #iSubmittedTxs = agents[i].get_submitted_transactions().copy()
+                                            indexSubmittedTxs = [youngTx for youngTx in agents[index].get_submitted_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
+                                            iSubmittedTxs =     [youngTx for youngTx in agents[i].get_submitted_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05]
 
-                                            indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
-                                            iConfirmedTxs = agents[i].get_confirmed_transactions()
+
+                                            #indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
+                                            #iConfirmedTxs = agents[i].get_confirmed_transactions().copy()
+                                            indexConfirmedTxs = [youngTx for youngTx in agents[index].get_confirmed_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
+                                            iConfirmedTxs =     [youngTx for youngTx in agents[i].get_confirmed_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
 
                                             #Trade blocks
                                             agents[index].add_visible_blocks(iVisBlocks, time)
@@ -1133,6 +1166,285 @@ class Multi_Agent_Simulation:
                                             agents[index].add_confirmed_transactions(iConfirmedTxs, time)
                                             agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
 
+                                        elif (self.reconcile)<=agents[index].p2pTime[i]<(self.reconcile+1):
+                                            self.counter=self.counter+1
+                                            #print("\nReconcilling: ",index, " ~ ",i," \tp2pTime: ",agents[index].p2pTime[i], "\treconcile Count: ",self.counter)
+                                            ##Only happen after reconcile time
+                                            ##trade blocks
+                                            #get blocks
+                                            indexVisBlocks = agents[index].get_visible_blocks().copy()
+                                            iVisBlocks = agents[i].get_visible_blocks().copy()
+
+                                            indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
+                                            iLinkedBlocks =  agents[i].get_linked_blocks().copy()
+
+                                            ##Trade txs
+                                            #get txs
+                                            indexVisibleTxs = agents[index].get_visible_transactions().copy()
+                                            iVisibleTxs = agents[i].get_visible_transactions().copy()
+
+                                            indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
+                                            iSubmittedTxs = agents[i].get_submitted_transactions().copy()
+
+                                            indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
+                                            iConfirmedTxs = agents[i].get_confirmed_transactions().copy()
+
+
+                                            ##apply prefilter #self.prefilterTime
+                                            ##txs
+                                            #oldvisTxLen=len(indexVisibleTxs)
+                                            indexVisibleTxs = [youngTx for youngTx in indexVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+                                            iVisibleTxs = [youngTx for youngTx in iVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+
+                                            indexSubmittedTxs = [youngTx for youngTx in indexSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+                                            iSubmittedTxs = [youngTx for youngTx in iSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+
+                                            indexConfirmedTxs = [youngTx for youngTx in indexConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+                                            iConfirmedTxs = [youngTx for youngTx in iConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime and random.random()> self.falsePositive ]
+
+                                            ###blocks, use blockfilterTime
+                                            indexVisBlocks = [youngBlock for youngBlock in indexVisBlocks if (time - youngBlock.creation_time) < self.blockfilterTime and random.random()> self.falsePositive ]
+                                            iVisBlocks = [youngBlock for youngBlock in iVisBlocks if (time - youngBlock.creation_time) < self.blockfilterTime and random.random()> self.falsePositive ]
+
+                                            indexLinkedBlocks = [youngBlock for youngBlock in indexLinkedBlocks if (time - youngBlock.creation_time) < self.blockfilterTime and random.random()> self.falsePositive ]
+                                            iLinkedBlocks = [youngBlock for youngBlock in iLinkedBlocks if (time - youngBlock.creation_time) < self.blockfilterTime and random.random()> self.falsePositive ]
+
+                                            ##RECORD UNION, difference of blocks/txs for txFilter and p2p(?)
+                                            if (self.p2p):
+                                                #indexTxs = agents[index].get_visible_transactions() + agents[index].get_submitted_transactions()  + agents[index].get_confirmed_transactions()
+                                                #iTxs = agents[i].get_visible_transactions() + agents[i].get_submitted_transactions()  + agents[i].get_confirmed_transactions()
+                                                indexTxs = indexVisibleTxs +  indexSubmittedTxs + indexConfirmedTxs
+                                                iTxs = iVisibleTxs +  iSubmittedTxs + iConfirmedTxs
+
+                                                indexBlocks = agents[index].get_visible_blocks() + agents[index].get_linked_blocks()
+                                                iBlocks =         agents[i].get_visible_blocks() +     agents[i].get_linked_blocks()
+
+                                                uTxs =    set(indexTxs).union(set(iTxs))
+                                                uBlocks = set(indexBlocks).union(set(iBlocks))
+
+                                                #dTxs = set(uTxs) - set(indexTxs)
+                                                #dBlocks = set(uBlocks) - set(indexBlocks)
+                                                dTxs = set(uTxs) - set(iTxs)
+                                                dBlocks = set(uBlocks) - set(iBlocks)
+
+                                                tTxs =    [time - t.arrival_time for t in dTxs]
+                                                tBlocks = [time - t.creation_time for t in dBlocks]
+
+                                            #Trade blocks
+                                            agents[index].add_visible_blocks(iVisBlocks, time)
+                                            agents[i].add_visible_blocks(indexVisBlocks, time)
+
+                                            #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                            #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+                                            agents[index].add_linked_blocks(iLinkedBlocks, time)
+                                            agents[i].add_linked_blocks(indexLinkedBlocks, time)
+
+
+                                            #trade txs
+                                            agents[index].add_visible_transactions(iVisibleTxs, time)
+                                            agents[i].add_visible_transactions(indexVisibleTxs, time)
+
+                                            agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                            agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+
+                                            agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                            agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+
+
+
+                                            ##record p2p interactions
+                                            if (self.p2p):
+                                                #txs
+                                                unionVisTxSize =        len(agents[index].get_visible_transactions())
+                                                unionSubmittedTxSize =  len(agents[index].get_submitted_transactions())
+                                                unionConfirmedTxSize =  len(agents[index].get_confirmed_transactions())
+
+
+                                                ##difference
+                                                dVisTxs = set(agents[index].get_visible_transactions()) - set(indexVisibleTxs)
+                                                dSubTxs = set(agents[index].get_submitted_transactions()) - set(indexSubmittedTxs)
+                                                dConTxs = set(agents[index].get_confirmed_transactions()) - set(indexConfirmedTxs)
+
+                                                dVisBlocks  = set(agents[index].get_visible_blocks()) - set(indexVisBlocks)
+                                                dLinkBlocks = set(agents[index].get_linked_blocks()) - set(indexLinkedBlocks)
+
+                                                #blocks, no pruned blocks
+                                                unionVisBlockSize =     len(agents[index].get_visible_blocks())
+                                                unionLinkedBlockSize =  len(agents[index].get_linked_blocks())
+
+
+                                                ##TimeDifference of intersections
+                                                tVisTxs = [time - t.arrival_time for t in dVisTxs]
+                                                tSubTxs = [time - t.arrival_time for t in dSubTxs]
+                                                tConTxs = [time - t.arrival_time for t in dConTxs]
+
+                                                tVisBlocks =  [time - t.creation_time for t in dVisBlocks]
+                                                tLinkBlocks = [time - t.creation_time for t in dLinkBlocks]
+                                                #print(agents[index].get_confirmed_transactions())
+
+
+
+                                                if 0<agents[index].p2pTime[i]<=1:
+
+                                                    ##Don't need for now
+                                                    #agents[index].recordP2P(time, unionVisTxSize, len(dVisTxs), tVisTxs, unionSubmittedTxSize, len(dSubTxs), tSubTxs, unionConfirmedTxSize, len(dConTxs), tConTxs, unionVisBlockSize, len(dVisBlocks), tVisBlocks, unionLinkedBlockSize, len(dLinkBlocks), tLinkBlocks, len(uTxs), len(dTxs), tTxs, len(uBlocks), len(dBlocks), tBlocks )
+
+                                                    ##save txTransfer Data
+                                                    if index==0:
+                                                        indexUtxs = len(indexVisibleTxs) + len(indexSubmittedTxs) + len(indexConfirmedTxs)
+                                                    #    iUtxs = len(iVisibleTxs) + len(iSubmittedTxs) + len(iConfirmedTxs)
+                                                        indexUtxs2 = []
+                                                        for tx in indexVisibleTxs + indexSubmittedTxs + indexConfirmedTxs:
+                                                            if (time-tx.arrival_time)<self.prefilterTime:
+                                                                indexUtxs2.append(tx)
+                                                        #comment out txTrade, not necessary for this portion
+                                                        for tx in indexUtxs2:
+                                                            #agents[index].txTrade.append([time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+                                                            agents[index].txTrade.append(['tx',time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+
+                                                        indexUBlocks = indexVisBlocks + indexLinkedBlocks
+                                                        for block in indexUBlocks:
+                                                            agents[index].txTrade.append(['block',time, len(indexUBlocks), block.id, block.creators, block.creation_time, time-block.creation_time, i, block in dBlocks])
+
+                                        # elif (self.reconcile2)<=agents[index].p2pTime[i]<(self.reconcile2+1):
+                                        #     ##Only happen after reconcile2 time (second pass)
+                                        #     ##trade blocks
+                                        #     #get blocks
+                                        #     indexVisBlocks = agents[index].get_visible_blocks().copy()
+                                        #     iVisBlocks = agents[i].get_visible_blocks().copy()
+                                        #
+                                        #     indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
+                                        #     iLinkedBlocks =  agents[i].get_linked_blocks().copy()
+                                        #
+                                        #     ##Trade txs
+                                        #     #get txs
+                                        #     indexVisibleTxs = agents[index].get_visible_transactions().copy()
+                                        #     iVisibleTxs = agents[i].get_visible_transactions().copy()
+                                        #
+                                        #     indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
+                                        #     iSubmittedTxs = agents[i].get_submitted_transactions().copy()
+                                        #
+                                        #     indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
+                                        #     iConfirmedTxs = agents[i].get_confirmed_transactions().copy()
+                                        #
+                                        #
+                                        #     ##apply prefilter #self.prefilterTime
+                                        #     ##txs
+                                        #     #oldvisTxLen=len(indexVisibleTxs)
+                                        #     indexVisibleTxs =   [youngTx for youngTx in indexVisibleTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #     iVisibleTxs =       [youngTx for youngTx in iVisibleTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #
+                                        #     indexSubmittedTxs = [youngTx for youngTx in indexSubmittedTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #     iSubmittedTxs =     [youngTx for youngTx in iSubmittedTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #
+                                        #     indexConfirmedTxs = [youngTx for youngTx in indexConfirmedTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #     iConfirmedTxs =     [youngTx for youngTx in iConfirmedTxs if (self.prefilterTime)<=(time - youngTx.arrival_time) < (self.prefilterTime*2) and random.random()> self.falsePositive ]
+                                        #
+                                        #     ###blocks, use blockfilterTime
+                                        #     indexVisBlocks =    [youngBlock for youngBlock in indexVisBlocks if (self.blockfilterTime)<=(time - youngBlock.creation_time) < (self.blockfilterTime*2) and random.random()> self.falsePositive ]
+                                        #     iVisBlocks =        [youngBlock for youngBlock in iVisBlocks if (self.blockfilterTime)<=(time - youngBlock.creation_time) < (self.blockfilterTime*2) and random.random()> self.falsePositive ]
+                                        #
+                                        #     indexLinkedBlocks = [youngBlock for youngBlock in indexLinkedBlocks if (self.blockfilterTime)<=(time - youngBlock.creation_time) < (self.blockfilterTime*2) and random.random()> self.falsePositive ]
+                                        #     iLinkedBlocks =     [youngBlock for youngBlock in iLinkedBlocks if (self.blockfilterTime)<=(time - youngBlock.creation_time) < (self.blockfilterTime*2) and random.random()> self.falsePositive ]
+                                        #
+                                        #     ##RECORD UNION, difference of blocks/txs for txFilter and p2p(?)
+                                        #     if (self.p2p):
+                                        #         #indexTxs = agents[index].get_visible_transactions() + agents[index].get_submitted_transactions()  + agents[index].get_confirmed_transactions()
+                                        #         #iTxs = agents[i].get_visible_transactions() + agents[i].get_submitted_transactions()  + agents[i].get_confirmed_transactions()
+                                        #         indexTxs = indexVisibleTxs +  indexSubmittedTxs + indexConfirmedTxs
+                                        #         iTxs = iVisibleTxs +  iSubmittedTxs + iConfirmedTxs
+                                        #
+                                        #         indexBlocks = agents[index].get_visible_blocks() + agents[index].get_linked_blocks()
+                                        #         iBlocks =         agents[i].get_visible_blocks() +     agents[i].get_linked_blocks()
+                                        #
+                                        #         uTxs =    set(indexTxs).union(set(iTxs))
+                                        #         uBlocks = set(indexBlocks).union(set(iBlocks))
+                                        #
+                                        #         #dTxs = set(uTxs) - set(indexTxs)
+                                        #         #dBlocks = set(uBlocks) - set(indexBlocks)
+                                        #         dTxs = set(uTxs) - set(iTxs)
+                                        #         dBlocks = set(uBlocks) - set(iBlocks)
+                                        #
+                                        #         tTxs =    [time - t.arrival_time for t in dTxs]
+                                        #         tBlocks = [time - t.creation_time for t in dBlocks]
+                                        #
+                                        #     #Trade blocks
+                                        #     agents[index].add_visible_blocks(iVisBlocks, time)
+                                        #     agents[i].add_visible_blocks(indexVisBlocks, time)
+                                        #
+                                        #     #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
+                                        #     #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
+                                        #     agents[index].add_linked_blocks(iLinkedBlocks, time)
+                                        #     agents[i].add_linked_blocks(indexLinkedBlocks, time)
+                                        #
+                                        #
+                                        #     #trade txs
+                                        #     agents[index].add_visible_transactions(iVisibleTxs, time)
+                                        #     agents[i].add_visible_transactions(indexVisibleTxs, time)
+                                        #
+                                        #     agents[index].add_submitted_transactions(iSubmittedTxs, time)
+                                        #     agents[i].add_submitted_transactions(indexSubmittedTxs, time)
+                                        #
+                                        #     agents[index].add_confirmed_transactions(iConfirmedTxs, time)
+                                        #     agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
+                                        #
+                                        #
+                                        #
+                                        #     ##record p2p interactions
+                                        #     if (self.p2p):
+                                        #         #txs
+                                        #         unionVisTxSize =        len(agents[index].get_visible_transactions())
+                                        #         unionSubmittedTxSize =  len(agents[index].get_submitted_transactions())
+                                        #         unionConfirmedTxSize =  len(agents[index].get_confirmed_transactions())
+                                        #
+                                        #
+                                        #         ##difference
+                                        #         dVisTxs = set(agents[index].get_visible_transactions()) - set(indexVisibleTxs)
+                                        #         dSubTxs = set(agents[index].get_submitted_transactions()) - set(indexSubmittedTxs)
+                                        #         dConTxs = set(agents[index].get_confirmed_transactions()) - set(indexConfirmedTxs)
+                                        #
+                                        #         dVisBlocks  = set(agents[index].get_visible_blocks()) - set(indexVisBlocks)
+                                        #         dLinkBlocks = set(agents[index].get_linked_blocks()) - set(indexLinkedBlocks)
+                                        #
+                                        #         #blocks, no pruned blocks
+                                        #         unionVisBlockSize =     len(agents[index].get_visible_blocks())
+                                        #         unionLinkedBlockSize =  len(agents[index].get_linked_blocks())
+                                        #
+                                        #
+                                        #         ##TimeDifference of intersections
+                                        #         tVisTxs = [time - t.arrival_time for t in dVisTxs]
+                                        #         tSubTxs = [time - t.arrival_time for t in dSubTxs]
+                                        #         tConTxs = [time - t.arrival_time for t in dConTxs]
+                                        #
+                                        #         tVisBlocks =  [time - t.creation_time for t in dVisBlocks]
+                                        #         tLinkBlocks = [time - t.creation_time for t in dLinkBlocks]
+                                        #         #print(agents[index].get_confirmed_transactions())
+                                        #
+                                        #
+                                        #
+                                        #         if 0<agents[index].p2pTime[i]<=1:
+                                        #
+                                        #             ##Don't need for now
+                                        #             #agents[index].recordP2P(time, unionVisTxSize, len(dVisTxs), tVisTxs, unionSubmittedTxSize, len(dSubTxs), tSubTxs, unionConfirmedTxSize, len(dConTxs), tConTxs, unionVisBlockSize, len(dVisBlocks), tVisBlocks, unionLinkedBlockSize, len(dLinkBlocks), tLinkBlocks, len(uTxs), len(dTxs), tTxs, len(uBlocks), len(dBlocks), tBlocks )
+                                        #
+                                        #             ##save txTransfer Data
+                                        #             if index==0:
+                                        #                 indexUtxs = len(indexVisibleTxs) + len(indexSubmittedTxs) + len(indexConfirmedTxs)
+                                        #             #    iUtxs = len(iVisibleTxs) + len(iSubmittedTxs) + len(iConfirmedTxs)
+                                        #                 indexUtxs2 = []
+                                        #                 for tx in indexVisibleTxs + indexSubmittedTxs + indexConfirmedTxs:
+                                        #                     if (time-tx.arrival_time)<self.prefilterTime:
+                                        #                         indexUtxs2.append(tx)
+                                        #                 #comment out txTrade, not necessary for this portion
+                                        #                 for tx in indexUtxs2:
+                                        #                     #agents[index].txTrade.append([time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+                                        #                     agents[index].txTrade.append(['tx',time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
+                                        #
+                                        #                 indexUBlocks = indexVisBlocks + indexLinkedBlocks
+                                        #                 for block in indexUBlocks:
+                                        #                     agents[index].txTrade.append(['block',time, len(indexUBlocks), block.id, block.creators, block.creation_time, time-block.creation_time, i, block in dBlocks])
+
+
                                     elif agents[index].p2pTime[i]==0: ##new interaction
                                         #print("\n\ncall inRange: ",time, "\tValue = ",agents[index].p2pTime[i], "\tprev = ",math.hypot( agents[index].past_coordinates[0] -  agents[i].past_coordinates[0],  agents[index].past_coordinates[1] -  agents[i].past_coordinates[1]))
                                         if time >1 and math.hypot( agents[index].past_coordinates[0] -  agents[i].past_coordinates[0],  agents[index].past_coordinates[1] -  agents[i].past_coordinates[1])<  agents[index].radius:
@@ -1143,151 +1455,12 @@ class Multi_Agent_Simulation:
                                         #print("Start time: ",agents[index].p2pTime[i])
                                         #add increment
 
-                                        ##Only happen if new interaction, not redundant
-                                        ##trade blocks
-                                        #get blocks
-                                        indexVisBlocks = agents[index].get_visible_blocks().copy()
-                                        iVisBlocks = agents[i].get_visible_blocks()
-
-                                        #indexConfirmedBlocks =  agents[index].get_confirmed_blocks()
-                                        #iConfirmedBlocks =  agents[i].get_confirmed_blocks()
-                                        indexLinkedBlocks =  agents[index].get_linked_blocks().copy()
-                                        iLinkedBlocks =  agents[i].get_linked_blocks()
-
-                                        ##Trade txs
-                                        #get txs
-                                        indexVisibleTxs = agents[index].get_visible_transactions().copy()
-                                        iVisibleTxs = agents[i].get_visible_transactions()
-                                        #if index==0:
-                                            #print(indexVisibleTxs)
-                                            #print(iVisibleTxs)
-
-                                        indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
-                                        iSubmittedTxs = agents[i].get_submitted_transactions()
-
-                                        indexConfirmedTxs = agents[index].get_confirmed_transactions().copy()
-                                        iConfirmedTxs = agents[i].get_confirmed_transactions()
-
-
-                                        ##apply prefilter #self.prefilterTime
-                                        ##txs
-                                        oldvisTxLen=len(indexVisibleTxs)
-                                        indexVisibleTxs = [youngTx for youngTx in indexVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-                                        iVisibleTxs = [youngTx for youngTx in iVisibleTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-
-                                        indexSubmittedTxs = [youngTx for youngTx in indexSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-                                        iSubmittedTxs = [youngTx for youngTx in iSubmittedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-
-                                        indexConfirmedTxs = [youngTx for youngTx in indexConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-                                        iConfirmedTxs = [youngTx for youngTx in iConfirmedTxs if (time - youngTx.arrival_time) < self.prefilterTime ]
-
-                                        ###blocks
-                                        indexVisBlocks = [youngBlock for youngBlock in indexVisBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
-                                        iVisBlocks = [youngBlock for youngBlock in iVisBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
-
-                                        indexLinkedBlocks = [youngBlock for youngBlock in indexLinkedBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
-                                        iLinkedBlocks = [youngBlock for youngBlock in iLinkedBlocks if (time - youngBlock.creation_time) < self.prefilterTime ]
-
-                                        if (self.p2p):
-                                            #indexTxs = agents[index].get_visible_transactions() + agents[index].get_submitted_transactions()  + agents[index].get_confirmed_transactions()
-                                            #iTxs = agents[i].get_visible_transactions() + agents[i].get_submitted_transactions()  + agents[i].get_confirmed_transactions()
-                                            indexTxs = indexVisibleTxs +  indexSubmittedTxs + indexConfirmedTxs
-                                            iTxs = iVisibleTxs +  iSubmittedTxs + iConfirmedTxs
-
-                                            indexBlocks = agents[index].get_visible_blocks() + agents[index].get_linked_blocks()
-                                            iBlocks =         agents[i].get_visible_blocks() +     agents[i].get_linked_blocks()
-
-                                            uTxs =    set(indexTxs).union(set(iTxs))
-                                            uBlocks = set(indexBlocks).union(set(iBlocks))
-
-                                            #dTxs = set(uTxs) - set(indexTxs)
-                                            #dBlocks = set(uBlocks) - set(indexBlocks)
-                                            dTxs = set(uTxs) - set(iTxs)
-                                            dBlocks = set(uBlocks) - set(iBlocks)
-
-                                            tTxs =    [time - t.arrival_time for t in dTxs]
-                                            tBlocks = [time - t.creation_time for t in dBlocks]
-
-                                        #Trade blocks
-                                        agents[index].add_visible_blocks(iVisBlocks, time)
-                                        agents[i].add_visible_blocks(indexVisBlocks, time)
-
-                                        #agents[index].add_confirmed_blocks(iConfirmedBlocks, time)
-                                        #agents[i].add_confirmed_blocks(indexConfirmedBlocks, time)
-                                        agents[index].add_linked_blocks(iLinkedBlocks, time)
-                                        agents[i].add_linked_blocks(indexLinkedBlocks, time)
-
-
-                                        #trade txs
-                                        agents[index].add_visible_transactions(iVisibleTxs, time)
-                                        agents[i].add_visible_transactions(indexVisibleTxs, time)
-
-                                        agents[index].add_submitted_transactions(iSubmittedTxs, time)
-                                        agents[i].add_submitted_transactions(indexSubmittedTxs, time)
-
-                                        agents[index].add_confirmed_transactions(iConfirmedTxs, time)
-                                        agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
-
-
-
-                                        ##record p2p interactions
-                                        if (self.p2p):
-                                            #txs
-                                            unionVisTxSize =        len(agents[index].get_visible_transactions())
-                                            unionSubmittedTxSize =  len(agents[index].get_submitted_transactions())
-                                            unionConfirmedTxSize =  len(agents[index].get_confirmed_transactions())
-
-
-                                            ##difference
-                                            dVisTxs = set(agents[index].get_visible_transactions()) - set(indexVisibleTxs)
-                                            dSubTxs = set(agents[index].get_submitted_transactions()) - set(indexSubmittedTxs)
-                                            dConTxs = set(agents[index].get_confirmed_transactions()) - set(indexConfirmedTxs)
-
-                                            dVisBlocks  = set(agents[index].get_visible_blocks()) - set(indexVisBlocks)
-                                            dLinkBlocks = set(agents[index].get_linked_blocks()) - set(indexLinkedBlocks)
-
-                                            #blocks, no pruned blocks
-                                            unionVisBlockSize =     len(agents[index].get_visible_blocks())
-                                            unionLinkedBlockSize =  len(agents[index].get_linked_blocks())
-
-
-                                            ##TimeDifference of intersections
-                                            tVisTxs = [time - t.arrival_time for t in dVisTxs]
-                                            tSubTxs = [time - t.arrival_time for t in dSubTxs]
-                                            tConTxs = [time - t.arrival_time for t in dConTxs]
-
-                                            tVisBlocks =  [time - t.creation_time for t in dVisBlocks]
-                                            tLinkBlocks = [time - t.creation_time for t in dLinkBlocks]
-                                            #print(agents[index].get_confirmed_transactions())
-
-
-
-                                            if 0<agents[index].p2pTime[i]<=1:
-
-                                                ##Don't need for now
-                                                #agents[index].recordP2P(time, unionVisTxSize, len(dVisTxs), tVisTxs, unionSubmittedTxSize, len(dSubTxs), tSubTxs, unionConfirmedTxSize, len(dConTxs), tConTxs, unionVisBlockSize, len(dVisBlocks), tVisBlocks, unionLinkedBlockSize, len(dLinkBlocks), tLinkBlocks, len(uTxs), len(dTxs), tTxs, len(uBlocks), len(dBlocks), tBlocks )
-
-                                                ##save txTransfer Data
-                                                if index==0:
-                                                    indexUtxs = len(indexVisibleTxs) + len(indexSubmittedTxs) + len(indexConfirmedTxs)
-                                                #    iUtxs = len(iVisibleTxs) + len(iSubmittedTxs) + len(iConfirmedTxs)
-                                                    indexUtxs2 = []
-                                                    for tx in indexVisibleTxs + indexSubmittedTxs + indexConfirmedTxs:
-                                                        if (time-tx.arrival_time)<self.prefilterTime:
-                                                            indexUtxs2.append(tx)
-                                                    for tx in indexUtxs2:
-                                                        #agents[index].txTrade.append([time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
-                                                        agents[index].txTrade.append(['tx',time, len(indexUtxs2), tx.id, tx.agent, tx.arrival_time, time-tx.arrival_time, i, tx in dTxs])
-
-                                                    indexUBlocks = indexVisBlocks + indexLinkedBlocks
-                                                    for block in indexUBlocks:
-                                                        agents[index].txTrade.append(['block',time, len(indexUBlocks), block.id, block.creators, block.creation_time, time-block.creation_time, i, block in dBlocks])
-
-
-                            elif self.p2p and agents[index].p2pTime[i]>0: ##end of p2p interaction, cap p2pTime and add to p2pHistory
+                            #elif self.p2p and agents[index].p2pTime[i]>0: ##end of p2p interaction, cap p2pTime and add to p2pHistory
+                            elif agents[index].p2pTime[i]>0: ##end of p2p interaction, cap p2pTime and add to p2pHistory
                                 endTime = self.inRange(agents[index],agents[i])
                                 #print([time, i, agents[index].p2pTime[i] + endTime])
-                                agents[index].p2pHistory.append([time, index, i, agents[index].p2pTime[i] + endTime])
+                                if (self.p2p):
+                                    agents[index].p2pHistory.append([time, index, i, agents[index].p2pTime[i] + endTime]) ##p2phistory disbaled, dont need right now
                                 agents[index].p2pTime[i]=0
 
 
@@ -1861,6 +2034,9 @@ class Multi_Agent_Simulation:
         sortedVisBlocks = sorted(block.creators[0].get_visible_blocks(), key=lambda x: x.chainNum, reverse=True )
         #print("\nStart longest_selection_fast: ",block,"\t",sortedVisBlocks)
 
+        ##empty visBlocks
+        if not sortedVisBlocks:
+            sortedVisBlocks = sorted(block.creators[0].get_linked_blocks(), key=lambda x: x.chainNum, reverse=True )
         #print("\nSorted Visible Blocks: ")
         #for svb in sortedVisBlocks:
         #    print("\t", svb.chainNum,"\tconfirmed: ",svb.confirmed)
@@ -1877,6 +2053,11 @@ class Multi_Agent_Simulation:
         # print("LinkedBlocks: ",block.creators[0].get_linked_blocks())
         # print("\n")
         #print(block.creators[0].get_visible_blocks())
+        #print("Creator: ",block.creators[0], "\tvisBlocks",sortedVisBlocks)
+        #print(block.creators[0].get_visible_blocks())
+        #print(block.creators[0].get_linked_blocks())
+
+
         block.chainNum = max(sortedVisBlocks[0].chainNum + 1, block.chainNum)
         #print("\nStart longest_selection_fast: ",block,"\t",sortedVisBlocks)
         #3. For rest
@@ -1902,7 +2083,7 @@ class Multi_Agent_Simulation:
                         alreadyLinkedBlocks.append(sortedVisBlocks[longestIndex])
                 longestIndex = longestIndex + 1 #increment
 
-        #print("Final linkedBlocks: ",linkedBlocks)
+        #print("Final linkedBlocks: ", block.id, " --> ",linkedBlocks)
         #self.DG.add_edge(block, linkedBlocks) #add tips
         #block.blockLinks.append(linkedBlocks)
         for lb in linkedBlocks:
