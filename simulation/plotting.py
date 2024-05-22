@@ -6,6 +6,8 @@ import imageio #gif making
 import matplotlib.cm as cm #coloring
 import sys
 import math
+from simulation.block import DAGBlock, LinearBlock, HashGraphBlock
+
 #############################################################################
 # PRINTING AND PLOTTING
 #############################################################################
@@ -16,8 +18,8 @@ def print_info(self):
             ",  Lambda = " + str(self.lam)
     if(self.tip_selection_algo == "weighted-genesis" or "weighted-entry-point"):
         text += ",  Alpha = " + str(self.alpha)
-    if(self.no_of_agents != 1):
-        text += ",  Distances = " + str(self.distances)
+    #if(self.no_of_agents != 1):
+    #    text += ",  Distances = " + str(self.distances)
     text += " | Simulation started...\n"
     print(text)
 
@@ -49,7 +51,7 @@ def print_graph_temp(self):
     col = []
     for transaction in self.DG:
         if transaction.arrival_time > 0 and transaction.arrival_time % (1/self.lam_m) == 0:
-            
+
             linked=list(nx.descendants(self.DG, transaction))
             print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.arrival_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
             col.append('maroon')
@@ -100,23 +102,66 @@ def print_graph(self):
         # self.DG.node[tip]["node_color"] = '#ffdbb8'
         self.DG.nodes[tip]["node_color"] = self.agent_tip_colors[int(str(tip.creators[0]))]
 
-    
+
 
     # col = list(nx.get_node_attributes(self.DG, 'node_color').values()) #Didn't work on Linux
     col = []
     for transaction in self.DG:
-        if transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
-            linked=list(nx.descendants(self.DG, transaction))
-            
-            print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
-            col.append('maroon')
+        #for hashgraph
+        if isinstance(transaction, (HashGraphBlock)):
+            if transaction.witness==True:
+                if transaction.chainNum%3==0:
+                    col.append('red')
+                elif transaction.chainNum%3==1:
+                    col.append('blue')
+                else:
+                    col.append('green')
+
+            elif transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
+                linked=list(nx.descendants(self.DG, transaction))
+
+                #print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
+                col.append('maroon')
+            else:
+                col.append(self.DG.nodes[transaction]["node_color"])
         else:
-            col.append(self.DG.nodes[transaction]["node_color"])
+            if transaction.creation_time > 0 and transaction.creation_time % (1/self.lam_m) == 0:
+                linked=list(nx.descendants(self.DG, transaction))
+
+                #print('tx_ID: ', transaction.id, 'tx_arr_time: ', transaction.creation_time, 'Descendants: ', len(linked), ' Orphan Rate: ', 1-len(linked)/transaction.id  )
+                col.append('maroon')
+            else:
+                col.append(self.DG.nodes[transaction]["node_color"])
+
+
+
+    hashgraph=False
+    witnessSize=[]
+    witnessShape=[]
+    for block in self.DG:
+        if isinstance(block, (DAGBlock, LinearBlock)):
+            #print("linear/Dag")
+            pass
+        else:
+            hashgraph = True
+            #print("hashgraph")
+            if block.witness==True:
+                if block.famous==True:
+                    witnessSize.append(700)
+                else:
+                    witnessSize.append(250)
+                witnessShape.append('o')
+            else:
+                witnessSize.append(50)
+                witnessShape.append('o')
 
 
     #Creating figure
     plt.figure(1,figsize=(14, 7))
-    nx.draw_networkx(self.DG, pos, with_labels=True, node_size = 100, font_size=5.5, node_color = col)
+    if hashgraph:
+        nx.draw_networkx(self.DG, pos, with_labels=True,  font_size=5.5, node_color = col, node_size = witnessSize)
+    else: #not hashgraph
+        nx.draw_networkx(self.DG, pos, with_labels=True, node_size = 100, font_size=5.5, node_color = col)
     # nx.draw_networkx_labels(self.DG, lower_pos, labels=labels, font_size=6)
 
     #Print title
@@ -141,45 +186,45 @@ def print_coordinates(self, agents, time):
     ##NT: get agents coordinates into posx and posy
     posx=[]
     posy=[]
-    
+
     #Creating figure
     plt.figure(2,figsize=(14, 7))
     plt.cla()
     ax = plt.gca()
-    
+
     for index, agent in enumerate(agents):
         linex=[]
         liney=[]
-       
+
         posx.append(agent.coordinates[0])
         posy.append(agent.coordinates[1])
-        
-        
+
+
         #print(index,": curr Pos: ",str(agent.coordinates))
         #get linegraph
         for coordinates in agent.past_coordinates:
             linex.append(coordinates[0])
             liney.append(coordinates[1])
-            
+
             #print(coordinates)
-        
+
         plt.plot(linex,liney,color=colors[index]) #past positions
-        
+
         #plot radius
         circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),10, color='black', fill=False)
         ax.add_artist(circle)
-        
+
         if time>0:
             curX = [linex[-1],agent.coordinates[0]]
             curY = [liney[-1],agent.coordinates[1]]
             plt.plot(curX, curY, color=colors[index]) #current pos
-        
-        
+
+
     ##Get agent labels:
     labels=[]
     for i in range(0,len(agents)):
         labels.append("Agent "+str(i+1))
-                
+
     #create scatterplot
     plt.scatter(posx,posy,color=colors) #original
     ##reverse yx for image matching
@@ -189,7 +234,7 @@ def print_coordinates(self, agents, time):
     plt.xlabel("X axis Coordinates")
     plt.ylabel("Y axis Coordinates")
     plt.title(title)
-    
+
     for i, label in enumerate(labels):
         plt.annotate(label,[posx[i],posy[i]])
     plt.xlim(0,100)
@@ -197,72 +242,87 @@ def print_coordinates(self, agents, time):
     #Save the graph
     plt.savefig(f'./img/CG_{time}.png')
     #plt.close()
-    #plt.show() 
-    
-    
-    
+    #plt.show()
+
+
+
 ##NT: print_position of agents overtop backgroundimg
 
 ##NT: print_position of agents
 def print_coordinates_img(self, agents, time, backgroundImg):
+    #print("\nPRINT_COORDINATES_IMG: ",time)
 
-    colors = cm.rainbow(np.linspace(0, 1, len(agents)))
+    if self.basestations:
+        colors=cm.rainbow(np.linspace(0, 1, len(agents)+len(self.bsus)))
+    else:
+        colors = cm.rainbow(np.linspace(0, 1, len(agents)))
 
     ##NT: get agents coordinates into posx and posy
     posx=[]
     posy=[]
-    
+
     #Creating figure
     plt.figure(2,figsize=(14, 7))
     plt.cla()
     ax = plt.gca()
     plt.imshow(backgroundImg)
-    
+
     for index, agent in enumerate(agents):
         linex=[]
         liney=[]
-       
+
         posx.append(agent.coordinates[0])
         posy.append(agent.coordinates[1])
-        
+
         #print(index,": curr Pos: ",str(agent.coordinates))
         #get linegraph
         for coordinates in agent.past_coordinates:
             linex.append(coordinates[0])
             liney.append(coordinates[1])
             #print(coordinates)
-        
+
         plt.plot(linex,liney,color=colors[index]) #past positions
-        
+
         #plot radius
-        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),60, color='black', fill=False)
+        circle=plt.Circle((agent.coordinates[0],agent.coordinates[1]),agent.radius, color='black', fill=False)
         ax.add_artist(circle)
-        
+
         if time>0:
             curX = [linex[-1],agent.coordinates[0]]
             curY = [liney[-1],agent.coordinates[1]]
             plt.plot(curX, curY, color=colors[index]) #current pos
-        
-        
+
+
     ##Get agent labels:
     labels=[]
     for i in range(0,len(agents)):
         labels.append("Agent "+str(i+1))
-                
-                
+
+
+
+    if self.basestations:
+        for bs in self.bsus:
+            posx.append(bs.coordinates[0])
+            posy.append(bs.coordinates[1])
+            circle=plt.Circle((bs.coordinates[0],bs.coordinates[1]),agent.radius, color='black', fill=False)
+            ax.add_artist(circle)
+            labels.append("BSU "+str(bs.id))
+        #print(colors)
+        #sys.exit("PRINTING BSUS")
+
     #create scatterplot
     #for i in range(0,len(agents)): #check
     #    print("Agent:  ",i," ",agents[i].coordinates[0],", ",agents[i].coordinates[1])
     #    print(posx[i],", ",posy[i])
-    
-        
+
+
     plt.scatter(posx,posy,color=colors, s=250)
     #Print title
     title = "Transactions = " + str(self.no_of_transactions) + ", Time: " + str(time)
     plt.xlabel("X axis Coordinates")
     plt.ylabel("Y axis Coordinates")
     plt.title(title)
-    
+
     for i, label in enumerate(labels):
         plt.annotate(label,[posx[i],posy[i]])
     #plt.xlim(0,backgroundImg.shape[1])
@@ -270,11 +330,11 @@ def print_coordinates_img(self, agents, time, backgroundImg):
     #Save the graph
     plt.savefig(f'./img/CG_{time}.png')
     #plt.close()
-    #plt.show() 
-    
+    #plt.show()
+
     ##end program
     #sys.exit()
-    
+
 
 def print_gif(self, transactions):
 
@@ -289,17 +349,17 @@ def print_gif(self, transactions):
         time.append(i)
     #load all frames
     image=[]
-    
+
     for t in time:
         image = imageio.imread(f'./img/CG_{t}.png')
         frames.append(image)
-        
+
     #for i in range(0,5):
     #    frames.append(image)
-        
+
     #create gif
-    #imageio.mimsave('./CG_gif.gif',  frames,  fps = 5)  #fps is no longer supported, use duration 
-    imageio.mimsave('./CG_gif.gif',  frames, duration=2)  
+    #imageio.mimsave('./CG_gif.gif',  frames,  fps = 5)  #fps is no longer supported, use duration
+    imageio.mimsave('./CG_gif.gif',  frames, duration=2)
 
 
 

@@ -1,8 +1,8 @@
 # python cache
 *.pyc
-*.csv
+#*.csv
 *.gif
-*.png
+/img/CG_*.png
 # virtual env
 venv
 
@@ -13,8 +13,9 @@ venv
 .vscode/
 
 # simulation data
-SimuData/
-img/
+
+
+
 # DS_Store
 .DS_Store
 indirect_refs.csv
@@ -24,3 +25,6 @@ indirect_refs.csv
 
 # Zone.Identifier
 *Zone.Identifier
+
+# Subdirectory csvs
+/**/*.csv

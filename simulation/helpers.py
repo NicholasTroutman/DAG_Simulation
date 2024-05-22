@@ -5,9 +5,10 @@ import ast
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
+from simulation.mapMaker import Distance
 
-
-#create agent 
+#create agent
 
 #NT: Create random coordinates for each agent
 def create_coordinates(agents, maxDistance,):
@@ -16,17 +17,135 @@ def create_coordinates(agents, maxDistance,):
 
 #create random coordinates in [x,y] shape, of trafficImage
 def create_coordinates_nodes(agents, graph, tsp):
+    #print(graph)
     for agent in agents:
         begin, dest=np.random.choice(graph.nodes, size=2, replace=False)
-        #print(agent,": ",origin)
+        #print(agent,": ",begin)
+
         agent.coordinates = graph.nodes[begin]['pos']
+        #print(agent,": ",graph.nodes[begin]['pos'])
         agent.prev_dest = begin
-        agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set 
-        
-        streetSlope=[ graph.nodes[agent.destination[0]]['pos'][0]- graph.nodes[begin]['pos'][0],  graph.nodes[agent.destination[0]]['pos'][1] - graph.nodes[begin]['pos'][1]  ]   
-        
+        agent.destination = tsp(graph, nodes=[dest,begin], cycle=False)[1:] #set
+
+        streetSlope=[ graph.nodes[agent.destination[0]]['pos'][0]- graph.nodes[begin]['pos'][0],  graph.nodes[agent.destination[0]]['pos'][1] - graph.nodes[begin]['pos'][1]  ]
+
         agent.vector=streetSlope/np.linalg.norm(streetSlope)
         #print(agent.vector)
+
+
+#create base stations based on k-means clustering
+def createBaseStations(numBaseStations, graph, reps):
+    #print("\nCreateBaseStations")
+    #print(len(graph.nodes))
+
+    attempts=0
+    while True:
+        bsus = createBaseStationsRandomizer(numBaseStations,graph,reps)
+        #print("\n\nBSUS:")
+        classSize=[]
+        for bs in bsus:
+            #print(bs)
+            #print(len(bs[2]))
+            classSize.append(len(bs[2]))
+
+        #print("classSize: ",classSize)
+        #print("Minimum Cutoff:\t",((len(graph.nodes)/(numBaseStations))*2/3))
+        if min(classSize)<((len(graph.nodes)/(numBaseStations))*2/3):
+            attempts=attempts+1
+            print("BAD BSU PLACEMENT:\t",attempts)
+        else:
+            return bsus
+
+    #sys.exit("TESTING BEGONE")
+    return bsus
+
+def createBaseStationsRandomizer(numBaseStations, graph, reps):
+    #print("\nCreateBaseStations")
+    #print(len(graph.nodes))
+    if numBaseStations>(len(graph.nodes)/2):
+        sys.exit("Too Many BSUS, EXITING")
+
+    #print(graph)
+    bsus=[]
+    nodesUsed=[]
+    #initial starting points
+    for bs in range(0,numBaseStations):
+        loop=True
+        while(loop):
+            #print("\n\n",bsus)
+            begin, dest=np.random.choice(graph.nodes, size=2, replace=False)
+            #print(begin)
+            #print(graph.nodes)
+            #print(graph.nodes[node])
+            #print(graph.nodes[begin]['pos'])
+            coordinate=graph.nodes[begin]['pos']
+
+            #print("TESTING:")
+            #for b in bsus:
+                #print(b[1])
+
+            if begin not in nodesUsed:
+                nodesUsed.append(begin)
+                #[ID, current Coordinate, clustered nodes, average clustered Node]
+                bsus.append([bs,coordinate, [], [], [0,1]])
+                loop=False
+    #bsus  = [[id,coordinate]]
+    #print("Creation Done: ", bsus)
+
+    #k means time
+    for i in range(0,reps):
+        #print("\nRep: ",i)
+        #print(bsus)
+        #0. get rid of useless data]
+        for bs in bsus:
+            bs[2]=[]
+            bs[3]=[]
+        #1. Classify all nodes
+        for n in graph.nodes:
+            #print("\n",n)
+            closest = 10000000
+            closestBS = -1
+            for bs in bsus:
+                #print(bs)
+                #print(bs[1])
+                coord= graph.nodes[n]['pos']
+                diff = Distance(coord,bs[1])
+                #print("DIFF: ",diff)
+                if diff<closest:
+                    closest=diff
+                    closestBS = bs[0]
+                    #print(closestBS)
+            bsus[closestBS][2].append(n)
+            bsus[closestBS][3].append(coord)
+
+        #2. Get mean of all nodes
+        for bs in bsus:
+            average = [sum(x)/len(x) for x in zip(*bs[3])]
+            bs[4] =average
+
+        #print("Mean Done:")
+        #for bs in bsus:
+            #print(bs)
+
+        #3. Assign mean of each cluster to closest node
+        for bs in bsus:
+            closest = 10000000
+            closestNode = -1
+            for n in bs[2]:
+                coord= graph.nodes[n]['pos']
+                diff = Distance(coord,bs[4])
+                if diff<closest:
+                    closest=diff
+                    closestNode = n
+            bs[1]=graph.nodes[closestNode]['pos']
+            #print(closest)
+        #for bs in bsus:
+            #print(bs)
+        #4. Remove classification
+
+    #sys.exit("TESTING BEGONE")
+    return bsus
+
 
 
 def update_progress(progress, time):
@@ -177,39 +296,235 @@ def load_file(filename):
     return data
 
 
+def routes_export(file_name, agents):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        for agent in agents:
+            writer.writerow(agent.destination)
+
+
+
+
+
+def routes_importer(simulation, file_name):
+    with open(file_name, 'r') as file:
+       reader = csv.reader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+       data_list = list(reader)
+       #print(data_list)
+       for index, readDestinations in enumerate(data_list):
+           simulation.agents[index].destination=readDestinations
+       #sys.exit("END ROUTES_IMPORTER")
+
+
+def confirmationLayer_importer(simulation, file_name):
+    with open(file_name, 'r') as file:
+       reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+       #data_list = list(reader)
+
+       print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap, " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ", simulation.group)
+      # print("\n\n")
+       for row in reader:
+           blockTime = row['blockTime']
+           numAgents = row['numAgents']
+           map = row['map']
+           dlt = row['dlt']
+           refs = row['refs']
+           consensus = row['consensus']
+           group = row['group']
+           #if consensus==simulation.consensus:
+               #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #print((numAgents))
+               #print(int(numAgents)==int(simulation.no_of_agents))
+               #if int(simulation.no_of_agents) == int(numAgents):
+                   #print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+                   #print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap[:-4], " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ",simulation.group)
+
+
+
+           if (int(simulation.blockTime) == int(blockTime) and int(simulation.no_of_agents) == int(numAgents) and simulation.importMap[:-4] == map):
+               if (simulation.DLTMode == dlt and int(simulation.references) == int(refs)):
+
+                   if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                       #print("Found ConfirmationNumber: ",row['confirmationNumber'],"\t",row)
+                       return int(row['confirmationNumber'])
+            #sys.exit("MATCH DEBUGGING DONE")
+
+           #print(row['blockTime'], " ~ ",row['numAgents'])
+       if simulation.DLTMode =="dht" or simulation.DLTMode=="hashgraph":
+           print("DHT/Hashgraph no Confirmation Needed")
+           return int(3)
+       #sys.exit("No Confirmation Layer Found, RECOMPUTE")
+       ##linear check for 2 References
+
+    with open(file_name, 'r') as file:
+       reader = csv.DictReader(file,quoting = csv.QUOTE_NONNUMERIC, delimiter = ',')
+
+       if simulation.DLTMode=="linear": #check for 1
+           print("Recheck for ref=2 because Linear")
+           for row in reader:
+               blockTime = row['blockTime']
+               numAgents = row['numAgents']
+               map = row['map']
+               dlt = row['dlt']
+               refs = row['refs']
+               consensus = row['consensus']
+               group = row['group']
+               # print(consensus)
+               # if consensus==simulation.consensus:
+               #     print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #     print((numAgents))
+               #     print(int(numAgents)==int(simulation.no_of_agents))
+               #     if int(simulation.no_of_agents) == int(numAgents):
+               #         print(blockTime, " ",int(numAgents)," ", map, " ",dlt," ", int(refs), " ",consensus, " ",int(group))
+               #         print(simulation.blockTime, " ",simulation.no_of_agents," ", simulation.importMap[:-4], " ",simulation.DLTMode," ", simulation.references, " ",simulation.consensus, " ",simulation.group)
+
+
+
+               if (int(simulation.blockTime) == int(blockTime) and int(simulation.no_of_agents) == int(numAgents) and simulation.importMap[:-4] == map):
+
+                   if (simulation.DLTMode == dlt and int(2) == int(refs)):
+
+                       if(int(simulation.group)==int(group) and simulation.consensus==consensus):
+                          # print("Found ConfirmationNumber: ",row['confirmationNumber'])
+                           return int(row['confirmationNumber'])
+
+
+       print("NO CONFIRMATION LAYER FOUND, USE THESE RESULTS FOR COMPUTING CONFIRMATION LAYER")
+       sys.exit("NO CONF, ERROR")
+       return int(3)
+
 def csv_export(self, file_name):
 
     with open(file_name, 'w', newline='') as file:
         writer = csv.writer(file, dialect='excel')
         #Write csv file header
-        
-        header=['txID', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions']
+        if self.DLTMode == "hashgraph":
+            header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'orderTime', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
+
+        else:
+            header=['ID', 'confirmedBlock', 'confirmationTime', 'chainNum', 'confirmed_blocks', 'tips', 'arrival_time', 'agent',  'adoption_rate', 'block_transactions', 'transaction_creation_time']
         #print(self.DG.nodes[0].id)
         #print(self.DG.nodes[0].seen)
-        for transaction in self.DG.nodes:
-            #print("seenList: ",transaction.seen)
-            for agentId, agentSeen in enumerate(transaction.seen):
-                header.append(str("agent_"+str(agentId+1)))
-            break
-        print(header)
-        writer.writerow(header) #add confirmation time + 
+
+        #add header for agentSeen
+        for i in range(0,self.no_of_agents):
+            header.append(str("agent_"+str(i+1)))
+
+        #add headers for RSUseen
+        for i in range(0,self.basestations):
+            header.append(str("basestation_"+str(i+1)))
+
+
+        # for transaction in self.DG.nodes:
+        #     #print("seenList: ",transaction.seen)
+        #     for agentId, agentSeen in enumerate(transaction.seen):
+        #         header.append(str("agent_"+str(agentId+1)))
+        #     break
+
+
+
+        #print(header)
+        writer.writerow(header) #add confirmation time +
         #Write genesis
         #writer.writerow([0,[],0, '', 0, 0])
-        for transaction in self.DG.nodes:
+        for block in self.DG.nodes:
             #Write all other transactions
-            if(transaction.creation_time != 0):
-                line = []
-                line.append(transaction.id) #txid
-                line.append(list(self.DG.successors(transaction))) #tips
-                line.append(transaction.creation_time) #arrival_time
-                line.append(transaction.creators) ##int(transaction.creators[0].id)+1) #agent
-                
-                
-                #line.append(0) ##line.append(transaction.tip_selection_time
-                #line.append(0) ## line.append(transaction.weight_update_time)
-                line.append(len(list(nx.descendants(self.DG, transaction)))/(transaction.id+0.001)) #adoption_rate
-                line.append(transaction.blockTransactions)
-                for agentSeen in transaction.seen:
-                    line.append(agentSeen)
+            #if(block.creation_time != 0):
+            #print("\nBlock:\t",block.id,"\t",block.creation_time)
+            #print("creator:\t",block.creators)
+            line = []
+            line.append(block.id) #txid
+            line.append(block.confirmed)
+            line.append(block.confirmationTime)
+            line.append(block.chainNum)
+            if self.DLTMode == "hashgraph":
+                line.append(block.orderTime)
+            line.append(block.confirmedBlocks)
+            line.append(list(self.DG.successors(block))) #tips
+            line.append(block.creation_time) #arrival_time
+            line.append(block.creators) ##int(transaction.creators[0].id)+1) #agent
+
+
+            #line.append(0) ##line.append(transaction.tip_selection_time
+            #line.append(0) ## line.append(transaction.weight_update_time)
+            line.append(len(list(nx.descendants(self.DG, block)))/(block.id+0.001)) #adoption_rate
+            block.blockTransactions = sorted(block.blockTransactions,key=lambda x: x.id) #sort blockTransactions before printing
+            #print("\n\n",block.id, ".blockTransactions: ",block.blockTransactions)
+            line.append(block.blockTransactions)
+
+            txtimes = []
+            for tx in block.blockTransactions:
+                txtimes.append(math.ceil(tx.arrival_time))
+
+            #arrival time of all txs
+            line.append(txtimes)
+
+            for agentSeen in block.seen:
+                line.append(agentSeen)
+                #print("agentSeen:\t",agentSeen)
+            writer.writerow(line)
+
+
+def volume_export(self,file_name):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['time','numTxs','numBlocks','maxNumTxs','maxNumBlocks','blockTxs']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for line in self.agents[0].storageData:
+            writer.writerow(line)
+
+
+def p2p_export(self,file_name1,file_name2):
+    ##Don't need interaction for now
+    #with open(file_name1, 'w', newline='') as file:
+    #    writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+    #    headers = ['time', 'uVisTx', 'dVisTx', 'tVisTx', 'uSubTx', 'dSubTx', 'tSubTx',  'uConTx', 'dConTx', 'tConTx', 'uVisBlock', 'dVisBlock', 'tVisBlock', 'uLinkBlock', 'dLinkBlock', 'tLinkBlock','uTxs', 'dTxs', 'tTxs', 'uBlocks', 'dBlocks', 'tBlocks']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+    #    writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+    #    for agent in self.agents:
+    #        for line in agent.p2pData:
+    #            writer.writerow(line)
+    with open(file_name2, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['time','selfagentid', 'agentid','p2pTime']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for agent in self.agents:
+            for line in agent.p2pHistory:
                 writer.writerow(line)
 
+
+def tx_export(self,file_name):
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file, dialect='excel')
+        #Write csv file header
+        headers = ['type','time', 'numTxs', 'txid', 'txAgent', 'arrival_time', 'age', 'recipientAgent', 'new']
+        #print(self.DG.nodes[0].id)
+        #print(self.DG.nodes[0].seen)
+
+        #print(header)
+        writer.writerow(headers) #add confirmation time +
+        #Write genesis
+        #writer.writerow([0,[],0, '', 0, 0])
+        for agent in self.agents:
+            for line in agent.txTrade:
+                writer.writerow(line)
