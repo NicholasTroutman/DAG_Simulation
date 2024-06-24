@@ -12,7 +12,7 @@ class Agent(Node):
         self.destination=[]
         self.prev_dest=[]
         self.vector=[]
-
+        self.sleepTime = 0
         self.lastMintedBlock = 0
         #self.speed=40 #testing purpose
         #self.speed=7.74 #NICK HARDCODED THIS for Houston

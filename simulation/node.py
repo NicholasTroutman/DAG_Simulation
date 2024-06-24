@@ -22,6 +22,7 @@ class Node:
 
         ##TODO: Option to switch between lpwan/wifi/bluetooth
         radiusDic = {"Houstonredblue.jpg": 568.3, "HoustonHwyredblue.jpg": 25.085227} ##LPWAN
+        #print("WIFI")
         #radiusDic = {"Houstonredblue.jpg": 44.01, "HoustonHwyredblue.jpg": 1.42045454545} ##WIFI
         #radiusDic = {"Houstonredblue.jpg": 17.6056338028, "HoustonHwyredblue.jpg": 0.56818181818} ##BlueTooth
 

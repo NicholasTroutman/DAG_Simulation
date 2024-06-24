@@ -2325,15 +2325,37 @@ for (i in seq_along(blockFiles)) {
   
   ##for false positive rate!!
   pfDec=strsplit(gsub("_", " ",filename), " +")[[1]][6]
-  pfDec=substr(pfDec,1,nchar(pfDec)-4)
+  #pfDec=substr(pfDec,1,nchar(pfDec)-4)
   preFilterDF$fp[i] = as.numeric(pfDec)
+  
+  ##get ceiling
+  ceiling=strsplit(gsub("_", " ",filename), " +")[[1]][8]
+  ceiling=substr(ceiling,1,nchar(ceiling)-4)
+  preFilterDF$ceiling[i] = as.numeric(ceiling)
   
   
   ##get the latency
-  agentSeen = grepl("agent_", names(simuData)) #index for 
-  agentSeendf = data.frame(simuData[agentSeen])[2:200,]
-  sTimes = apply(agentSeendf, 1, function(x){x-min(x, na.rm=TRUE)})
-  preFilterDF$latency[i]=(sum(sTimes,na.rm=TRUE) + sum(is.na(sTimes))*max(sTimes,na.rm=TRUE))/(199*100)
+  #agentSeen = grepl("agent_", names(simuData)) #index for 
+  #agentSeendf = data.frame(simuData[agentSeen])[2:200,]
+  agentSeen = grepl("agent_", names(confirmedBlocks)) #index for 
+  agentSeendf = data.frame(confirmedBlocks[agentSeen])[1:(nrow(confirmedBlocks)-100),]
+  
+  ##find min of agentSeendf and corresponding confirmationTime
+  for (j in 2:nrow(agentSeendf)){
+    #test2[test <= confirmedBlocks$confirmationTime[2]] = confirmedBlocks$confirmationTime[2]
+    as = agentSeendf[j,]
+    as[as <= confirmedBlocks$confirmationTime[j]] = confirmedBlocks$confirmationTime[j] ##replaced
+    agentSeendf[j,] = as - confirmedBlocks$confirmationTime[j]
+  }
+  agentSeendf=agentSeendf[-1]
+  
+  #sTimes = apply(agentSeendf, 1, function(x){x-min(x)})
+  sTimes = apply(agentSeendf, 1, function(x){x-0})
+  preFilterDF$undelivered[i] = sum(is.na(sTimes))/length(sTimes)
+  preFilterDF$latency17[i]=(sum(sTimes,na.rm=TRUE) + sum(is.na(sTimes))*max(sTimes,na.rm=TRUE)*1.7)/(length(sTimes))
+  preFilterDF$latency[i]= mean(sTimes,na.rm=TRUE)
+  
+  ##latency = min(sTimes,confirmationTime)
   
   ##Expected Confirmation Time
   
@@ -2341,7 +2363,7 @@ for (i in seq_along(blockFiles)) {
   reSubmitTime = mean(txConfirmationTime, na.rm=TRUE) + sd(txConfirmationTime, na.rm=TRUE)*2
   preFilterDF$expectedConfirmation[i] = 0
   meanTime = mean(txConfirmationTime, na.rm=TRUE)
-  orphanRate = 1-preFilterDF$uniqueTxs[i]/(40000/2) #for 10000 txs
+  orphanRate = 1-preFilterDF$uniqueTxs[i]/(confirmedBlocks$arrival_time[nrow(confirmedBlocks)]/1) #for 10000 txs
   ##orphanRate = sum(simuData$confirmedBlock=="False")/nrow(simuData)
   preFilterDF$orphanageRate[i]=orphanRate
   for (n in 1:30){
@@ -2352,7 +2374,7 @@ for (i in seq_along(blockFiles)) {
   
   preFilterDF$totLatency[i] = preFilterDF$expectedConfirmation[i] + preFilterDF$latency[i]
   
-  
+
  
   
 
@@ -2368,8 +2390,163 @@ for (i in seq_along(blockFiles)) {
 #preFilterDF$latencyDistribution[i] = list(sTimes)
 preFilterDF$totnumConTxs[i] = length(txConfirmationTime) ##count unique later
 
-
+gc()
 }
+plot(preFilterDF$PreFilter, preFilterDF$undelivered, main="Highway, 100 Agents, 110 Second Reconcile, Buffer ~ Delivery", xlab="Filter Cutoff", ylab="Undelivered %")
+
+
+##combiNED
+library(ggplot2)
+##ETC
+ggplot() + 
+  geom_point(data = preFilterDF,aes( y=expectedConfirmation, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+  geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=expectedConfirmation, x=PreFilter, group=ceiling, col=ceiling, linetype='2'), size=0.9) +
+  ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+  labs(x="Fast Reconcile Cutoff", y="Expected Transaction Confirmation", col="Groups",linetype="# of References")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+  scale_color_gradient(low="blue", high="red") +
+  scale_linetype_manual(values=c('2'='dashed','3'='solid')) 
+  ylim(0,175) 
+  #geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10) + 
+  #scale_x_continuous(breaks = c(25,50,100,150,200))+ 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9), axis.line = element_line(colour = "black"), legend.title=element_text(face = "bold"),legend.key.width = unit(2,"cm"))
+
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=undelivered, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=undelivered, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Undelivered %", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red") +
+    scale_linetype_manual(values=c('2'='dashed','3'='solid')) 
+
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=undelivered, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=undelivered, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Undelivered %", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red") +
+    scale_linetype_manual(values=c('2'='dashed','3'='solid')) 
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=totLatency, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=totLatency, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Total Latency", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red") +
+    scale_linetype_manual(values=c('2'='dashed','3'='solid')) 
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=totLatency, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=totLatency, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Total Latency", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red") +
+    scale_linetype_manual(values=c('2'='dashed','3'='solid')) 
+  
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=throughput, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=throughput, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Throughput", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=throughput, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=throughput, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Throughput", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  mixedStrat2$tlt = mixedStrat2$totLatency/mixedStrat2$throughput
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=tlt, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=tlt, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Total Confirmation Latency / Throughput", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=tlt, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=tlt, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Total Confirmation Latency / Throughput", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+ 
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=latency17, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency17, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Tot Latency + Penalty", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=latency17, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency17, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Tot Latency + Penalty", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  mixedStrat2$tltPenalty = mixedStrat2$latency17/mixedStrat2$throughput
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=tltPenalty, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency17, x=ceiling, group=PreFilter, col=PreFilter), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Tot Latency + Penalty / Throughput", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  ggplot() + 
+    geom_point(data = mixedStrat2,aes( y=tltPenalty, x=PreFilter, group=ceiling, col=ceiling), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= mixedStrat2, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency17, x=PreFilter, group=ceiling, col=ceiling), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Fast Reconcile Cutoff", y="Tot Latency + Penalty / Throughput", col="Full Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  
+  #geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10) + 
+  #scale_x_continuous(breaks = c(25,50,100,150,200))+ 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9), axis.line = element_line(colour = "black"), legend.title=element_text(face = "bold"),legend.key.width = unit(2,"cm"))
+  
+
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=undelivered, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=undelivered, x=ceiling, group=PreFilter, col=PreFilter, linetype='2'), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Undelivered %", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  ylim(0,175) 
+  #geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10) + 
+  #scale_x_continuous(breaks = c(25,50,100,150,200))+ 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9), axis.line = element_line(colour = "black"), legend.title=element_text(face = "bold"),legend.key.width = unit(2,"cm"))
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=expectedConfirmation, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=expectedConfirmation, x=ceiling, group=PreFilter, col=PreFilter, linetype='2'), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="ETC", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+  ylim(0,175) 
+  #geom_label_repel(data=refDataDownTown3refs[c(1:3,10,11,12,13,16),], aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group),box.padding   = 0.4, point.padding = 0.4, label.size=0.75,direction=("y"),nudge_y=10) + 
+  #scale_x_continuous(breaks = c(25,50,100,150,200))+ 
+  theme(plot.title = element_text(size=30),legend.justification=c(1,1), legend.position=c(0.9,0.9), axis.line = element_line(colour = "black"), legend.title=element_text(face = "bold"),legend.key.width = unit(2,"cm"))
+  
+  
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=latency, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency, x=ceiling, group=PreFilter, col=PreFilter, linetype='2'), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Latency", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")
+
+  ggplot() + 
+    geom_point(data = preFilterDF,aes( y=latency17, x=ceiling, group=PreFilter, col=PreFilter), pch = 5,  position="dodge", stat="identity") +
+    geom_smooth(data= preFilterDF, se=FALSE,  formula=y ~ poly(x, 1, raw=TRUE), span=0.6 ,aes( y=latency17, x=ceiling, group=PreFilter, col=PreFilter, linetype='2'), size=0.9) +
+    ggtitle(paste("Highway Mixed Reconcile Strategies ")) +
+    labs(x="Full Reconcile Cutoff", y="Latency", col="Fast Reconcile Cutoff")+  #xlab("Number of Agents") + ylab("Expected Transaction Confirmation Time")+
+    scale_color_gradient(low="blue", high="red")  
+  
 
 ##PLot all lines
 plot(1, type="n", xlab="", ylab="", xlim=c(0, 4000), ylim=c(0, 100))
@@ -2639,6 +2816,7 @@ ggplot(preFilterDF, aes(x=fp, y=throughputETC, group=PreFilter, color=PreFilter)
   theme(plot.title = element_text(size=26))
 
 
+library(ggplot2)
 ggplot(preFilterDF, aes(x=PreFilter, y=throughputETC, group=fp, color=fp)) + 
   geom_line() + 
   scale_fill_gradient(low="blue",high="orange") +
@@ -2664,7 +2842,7 @@ ggplot(preFilterDF, aes(x=fp, y=as.numeric(latency), group=PreFilter, color=PreF
   theme(plot.title = element_text(size=26))
 
 
-ggplot(preFilterDF, aes(x=PreFilter, y=as.numeric(throughputtotLat), group=fp, color=fp)) + 
+ggplot(preFilterDF, aes(x=fp, y=as.numeric(latency))) + 
   geom_line() + 
   scale_fill_gradient(low="blue",high="orange") +
   ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
@@ -2672,7 +2850,7 @@ ggplot(preFilterDF, aes(x=PreFilter, y=as.numeric(throughputtotLat), group=fp, c
   labs(fill="ECT") + 
   theme(plot.title = element_text(size=26))
 
-ggplot(preFilterDF, aes(x=fp, y=as.numeric(throughputtotLat), group=PreFilter, color=PreFilter)) + 
+ggplot(preFilterDF, aes(x=fp, y=as.numeric(expectedConfirmation))) + 
   geom_line() + 
   scale_fill_gradient(low="blue",high="orange") +
   ggtitle("Highway, 100 Agents, Filter Results ~ False Postive Rate") +
@@ -2680,6 +2858,57 @@ ggplot(preFilterDF, aes(x=fp, y=as.numeric(throughputtotLat), group=PreFilter, c
   labs(fill="ECT") + 
   theme(plot.title = element_text(size=26))
 
+f <- y ~ poly(x,5)
+ggplot(preFilterDF, aes(x=fp, y=as.numeric(totLatency))) + 
+  geom_line(lwd=2) + 
+  scale_fill_gradient(low="blue",high="orange") +
+  ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+  xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+  labs(fill="ECT") + 
+  theme(plot.title = element_text(size=26))#+
+  geom_smooth(lwd=3)
+
+
+  ggplot(preFilterDF, aes(x=fp, y=as.numeric(expectedConfirmation))) + 
+  
+      geom_line(lwd=2) + 
+    scale_fill_gradient(low="blue",high="orange") +
+    ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+    xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+    labs(fill="ECT") + 
+    theme(plot.title = element_text(size=26))
+  
+  ggplot(preFilterDF, aes(x=fp, y=as.numeric(latency))) + 
+    geom_line(lwd=2) + 
+    scale_fill_gradient(low="blue",high="orange") +
+    ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+    xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+    labs(fill="ECT") + 
+    theme(plot.title = element_text(size=26))
+  
+  ggplot(preFilterDF, aes(x=fp, y=as.numeric(thru))) + 
+    geom_line(lwd=2) + 
+    scale_fill_gradient(low="blue",high="orange") +
+    ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+    xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+    labs(fill="ECT") + 
+    theme(plot.title = element_text(size=26))
+  
+  ggplot(preFilterDF, aes(x=fp, y=as.numeric(totLatency/thru))) + 
+    geom_line(lwd=2) + 
+    scale_fill_gradient(low="blue",high="orange") +
+    ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+    xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+    labs(fill="ECT") + 
+    theme(plot.title = element_text(size=26))
+
+  ggplot(preFilterDF, aes(x=PreFilter, y=undelivered) + 
+    geom_line(lwd=2) + 
+    scale_fill_gradient(low="blue",high="orange") +
+    ggtitle("Highway, 100 Agents, False Positive Rate ~ Network Latency") +
+    xlab("Bloom Filter False Positive Rate") + ylab("Mean Tx Confirmation Latency") +
+    labs(fill="ECT") + 
+    theme(plot.title = element_text(size=26))
 
 
 ggplot(refDataDownTown2refs, aes( y=expectedConfirmation, x=numAgents, group=group, col=group, label=group), pch = 19) + 

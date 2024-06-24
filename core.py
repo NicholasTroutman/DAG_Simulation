@@ -42,8 +42,9 @@ minTxs=0
 keep=200
 p2p=0 #false, don't print p2p information
 falsePositive = 0
+ceiling = 0
 
-commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu =", "pruning =", "balance =", "maxTxs =", "minTxs =", "keep =", "p2p =", "prefilterTime =", "blockfilterTime =", "falsePositive ="]
+commands=["alpha =", "txs =", "netsize =", "lambda =", "printing =", "seed =", "dltmode =", "consensus =", "map =", "blocktime =", "references =", "group =", "volume =", "rsu =", "pruning =", "balance =", "maxTxs =", "minTxs =", "keep =", "p2p =", "prefilterTime =", "blockfilterTime =", "falsePositive =", "ceiling ="]
 opts, args = getopt.getopt(sys.argv[1:], "atnlpsdcmbrgvrpbmmk:p:", commands)
 for opt, arg in opts:
     print(opt," = ",arg)
@@ -164,6 +165,12 @@ for opt, arg in opts:
             falsePositive=float(arg)
         else:
             sys.exit("falsePositive INVALID")
+    elif opt in ('-c', '--ceiling '):
+        if float(arg)>=0:
+            ceiling = float(arg)
+        else:
+            sys.exit("ceiling invalid")
+
 
 
 
@@ -190,6 +197,7 @@ print("P2P: ",p2p)
 print("prefilterTime: ",prefilterTime)
 print("blockfilterTime: ",blockfilterTime)
 print("falsePositive: ",falsePositive)
+print("ceiling: ",ceiling)
 
 ##check for improper Group with near
 if consensus=="near" and group<2:
@@ -238,8 +246,8 @@ suffix = '.csv'
 timestr = time.strftime("%Y%m%d-%H%M")
 #base_name = '{}_{}_{}_txs_{}_tsa_{}_size_{}_seed_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_maxTxs_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_tCutoff_{}_bCutoff_{}_fp_{}' \
 #            .format(timestr, DLTMode, consensus, txs, tsa, netsize, seed, inputMap, blockTime, references, group, basestations, pruning, balance, maxTxs, minTxs, keep, p2p, lam, prefilterTime, blockfilterTime, falsePositive)
-base_name = '{}_{}_{}_txs_{}_size_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_tCutoff_{}_bCutoff_{}_fp_{}' \
-            .format(timestr, DLTMode, consensus, txs, netsize,  inputMap, blockTime, references, group, basestations, pruning, balance, minTxs, keep, p2p, lam, prefilterTime, blockfilterTime, falsePositive)
+base_name = '{}_{}_{}_txs_{}_size_{}_map_{}_blockTime_{}_refs_{}_group_{}_rsu_{}_pruning_{}_balance_{}_minTxs_{}_keep_{}_p2p_{}_lambda_{}_tCutoff_{}_bCutoff_{}_fp_{}_ceil_{}' \
+            .format(timestr, DLTMode, consensus, txs, netsize,  inputMap, blockTime, references, group, basestations, pruning, balance, minTxs, keep, p2p, lam, prefilterTime, blockfilterTime, falsePositive, ceiling)
 
 simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                             _no_of_agents = netsize, _alpha = alpha,
@@ -249,7 +257,8 @@ simu2 = Multi_Agent_Simulation(_no_of_transactions = txs, _lambda = lam,
                              _DLTMode=DLTMode, _consensus=consensus, _importMap=inputMap, _blockTime=blockTime,
                               _references=references, _group=group, _volume = volume, _basestations = basestations,
                                _pruning = pruning, _balance=balance, _maxTxs=maxTxs, _minTxs=minTxs,_keep=keep, _p2p=p2p,
-                                _prefilterTime=prefilterTime, _blockfilterTime=blockfilterTime, _falsePositive= falsePositive)
+                                _prefilterTime=prefilterTime, _blockfilterTime=blockfilterTime, _falsePositive= falsePositive,
+                                _ceiling = ceiling)
 simu2.setup()
 simu2.run()
 

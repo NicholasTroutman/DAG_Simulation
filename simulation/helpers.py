@@ -390,7 +390,7 @@ def confirmationLayer_importer(simulation, file_name):
 
 
        print("NO CONFIRMATION LAYER FOUND, USE THESE RESULTS FOR COMPUTING CONFIRMATION LAYER")
-       sys.exit("NO CONF, ERROR")
+       #sys.exit("NO CONF, ERROR")
        return int(3)
 
 def csv_export(self, file_name):

@@ -32,9 +32,10 @@ class Multi_Agent_Simulation:
                  _importMap = "Error", _blockTime = 40, _references = 1, _group = 1, \
                  _volume = 0, _basestations = 0, _pruning = 0, _balance = 0, _maxTxs = 130, \
                  _minTxs = 0, _keep = 100, _p2p=0, _prefilterTime=6000, _blockfilterTime=6000, \
-                 _falsePositive = 0):
+                 _falsePositive = 0, _ceiling  = 3000):
 
         ##define
+        self.fullCeiling = _ceiling
         self.counter = 0
         self.falsePositive = _falsePositive
         self.blockfilterTime = _blockfilterTime
@@ -65,11 +66,15 @@ class Multi_Agent_Simulation:
         self.blockTime = _blockTime
         self.importMap = str(_importMap)+str(".jpg")
         if "Hwy" in self.importMap:
+            #print("WIFI!!!!!!!!")
             self.reconcile = 42.36 #LoRaWAN
+            #print("fast reconcile is FALSE!!!!")
             #self.reconcile = 2.23 #WiFi
             #self.reconcile = 71.39 #Bluetooth
             self.fullReconcile=110 ##hwy hardcoded
-            self.fullCeiling=2500
+
+            #reconcileTime = (Nt + Nb)*(KtSum + (K)*B) + 2*(M + St*Nt*(Rt*(1-P)) + Sb*Nb*(Rb*(1-P)))/W
+
         else:
             self.reconcile = 71.39 #LoraWan
             #self.reconcile = 5.68 #WiFi
@@ -930,6 +935,11 @@ class Multi_Agent_Simulation:
             #print_coordinates(self, self.agents,
             print("TX_ID: ",transaction.id)
 
+        ###print sleepTime proportion:
+        # print("\nendtime: ",endTime)
+        # for a in self.agents:
+        #     print(a.sleepTime/endTime)
+
         #For measuring partitioning
         start_time2 = timeit.default_timer()
         # self.calc_exit_probabilities_multiple_agents(transaction)
@@ -1110,17 +1120,27 @@ class Multi_Agent_Simulation:
                                 if (True):
                                     #continuation
                                     if agents[index].p2pTime[i]>0: ##still in range add 1
-                                        agents[index].p2pTime[i]=agents[index].p2pTime[i]+1 #increment 1
+                                        agents[index].p2pTime[i]=agents[index].p2pTime[i]+1 #increment
+                                        agents[i].p2pTime[index]=agents[i].p2pTime[index]+1 #increment
 
+
+                                        ##get endless reconcile timing:
                                         #80/81 is hardcoded as a 10% threshold
+                                        #print("fullReconcile: ", self.fullReconcile)
                                         if (self.fullReconcile)<=agents[index].p2pTime[i]<(self.fullReconcile+1): ##trade all other txs/blocks ##hwy number,
                                             ##Send all blocks, with all submitted/confirmed txs, and subset of extremely old visTxs
-
+                                            #self.counter=self.counter+1
+                                            #print("\nReconcilling: ",index, " ~ ",i," \tp2pTime: ",agents[index].p2pTime[i], "\treconcile Count: ",self.counter)
                                             #indexVisBlocks =    agents[index].get_visible_blocks().copy()
                                             #iVisBlocks =        agents[i].get_visible_blocks().copy()
                                             indexVisBlocks = [youngBlock for youngBlock in agents[index].get_visible_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
                                             iVisBlocks =     [youngBlock for youngBlock in agents[i].get_visible_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
 
+                                            #print("\nCeiling: ",self.fullCeiling)
+                                            #print("len(indexVisBlocks):  ", len(indexVisBlocks))
+                                            #print(self.fullReconcile)
+                                            #if len(indexVisBlocks)>0:
+                                            #    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                                             #indexLinkedBlocks = agents[index].get_linked_blocks().copy()
                                             #iLinkedBlocks =     agents[i].get_linked_blocks().copy()
                                             indexLinkedBlocks = [youngBlock for youngBlock in agents[index].get_linked_blocks().copy() if self.blockfilterTime < (time - youngBlock.creation_time) < self.fullCeiling and random.random()> 0.05 ]
@@ -1133,7 +1153,8 @@ class Multi_Agent_Simulation:
                                             #iVisibleTxs = agents[i].get_visible_transactions().copy()
                                             indexVisibleTxs = [youngTx for youngTx in agents[index].get_visible_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
                                             iVisibleTxs =     [youngTx for youngTx in agents[i].get_visible_transactions().copy() if self.prefilterTime <(time - youngTx.arrival_time) < self.fullCeiling and random.random()> 0.05 ]
-
+                                            #print(len(indexVisibleTxs))
+                                            #print(len(iVisibleTxs))
 
                                             #indexSubmittedTxs = agents[index].get_submitted_transactions().copy()
                                             #iSubmittedTxs = agents[i].get_submitted_transactions().copy()
@@ -1166,8 +1187,8 @@ class Multi_Agent_Simulation:
                                             agents[index].add_confirmed_transactions(iConfirmedTxs, time)
                                             agents[i].add_confirmed_transactions(indexConfirmedTxs, time)
 
-                                        elif (self.reconcile)<=agents[index].p2pTime[i]<(self.reconcile+1):
-                                            self.counter=self.counter+1
+                                        elif (self.reconcile)<=agents[index].p2pTime[i]<(self.reconcile+1): ##TODO PRINTED FALSE
+
                                             #print("\nReconcilling: ",index, " ~ ",i," \tp2pTime: ",agents[index].p2pTime[i], "\treconcile Count: ",self.counter)
                                             ##Only happen after reconcile time
                                             ##trade blocks
@@ -1305,6 +1326,10 @@ class Multi_Agent_Simulation:
                                                         indexUBlocks = indexVisBlocks + indexLinkedBlocks
                                                         for block in indexUBlocks:
                                                             agents[index].txTrade.append(['block',time, len(indexUBlocks), block.id, block.creators, block.creation_time, time-block.creation_time, i, block in dBlocks])
+
+
+
+
 
                                         # elif (self.reconcile2)<=agents[index].p2pTime[i]<(self.reconcile2+1):
                                         #     ##Only happen after reconcile2 time (second pass)
@@ -1450,8 +1475,10 @@ class Multi_Agent_Simulation:
                                         if time >1 and math.hypot( agents[index].past_coordinates[0] -  agents[i].past_coordinates[0],  agents[index].past_coordinates[1] -  agents[i].past_coordinates[1])<  agents[index].radius:
                                             #print("classose Last Time, use 1")
                                             agents[index].p2pTime[i]=1
+                                            agents[i].p2pTime[index]=1
                                         else: ##newly in range, p2pTime new
                                             agents[index].p2pTime[i] =  self.inRange(agents[index],agents[i])
+                                            agents[i].p2pTime[index] = agents[index].p2pTime[i]
                                         #print("Start time: ",agents[index].p2pTime[i])
                                         #add increment
 
@@ -1462,8 +1489,13 @@ class Multi_Agent_Simulation:
                                 if (self.p2p):
                                     agents[index].p2pHistory.append([time, index, i, agents[index].p2pTime[i] + endTime]) ##p2phistory disbaled, dont need right now
                                 agents[index].p2pTime[i]=0
+                                agents[i].p2pTime[index]=0
+                                #print("index: ",index, "\ti: ",i,"\tZERO")
 
-
+                #print(sum(agents[index].p2pTime)) #TODO TEMPORARY
+                #print("index: ",index, "  ~ ",sum(agents[index].p2pTime))
+                if (sum(agents[index].p2pTime))==0:
+                    agents[index].sleepTime= agents[index].sleepTime  + 1
                 ##localBlock necessity
                 if self.consensus == "near":
                     if neighborsCount >= (self.group-1): #need >self.group
